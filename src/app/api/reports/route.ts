@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { getRequestTenant } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
     const db = getDb();
     const { searchParams } = new URL(request.url);
-    const tenantId = searchParams.get('tenantId') || 'default-tenant';
+    const tenantId = getRequestTenant(request);
 
     // Dashboard stats
     const totalClients = (db.prepare('SELECT COUNT(*) as count FROM clients WHERE tenant_id = ?').get(tenantId) as any).count;

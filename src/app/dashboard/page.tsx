@@ -47,6 +47,54 @@ const NAV_ITEMS = [
 const INR = (n: number) => `₹${Math.abs(n).toLocaleString('en-IN')}`;
 const cls = (...a: (string | false | undefined)[]) => a.filter(Boolean).join(' ');
 
+function UserMenu() {
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((d) => setUser(d.user))
+      .catch(() => {});
+  }, []);
+
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  }
+
+  const initials = user ? user.name.slice(0, 2).toUpperCase() : 'CA';
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-medium hover:bg-slate-700"
+        title={user ? `${user.name} (${user.email})` : 'Account'}
+      >
+        {initials}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-2 w-60 rounded-2xl bg-white border border-slate-200 shadow-xl z-40 overflow-hidden animate-fadeIn">
+            <div className="px-4 py-3 border-b border-slate-100">
+              <p className="text-sm font-semibold truncate">{user?.name || 'Loading…'}</p>
+              <p className="text-xs text-slate-500 truncate">{user?.email || ''}</p>
+            </div>
+            <button
+              onClick={logout}
+              className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 font-medium"
+            >
+              Log out
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ---------- page ----------
 export default function CAFlowDashboard() {
   const [view, setView] = useState<View>('dashboard');
@@ -320,7 +368,7 @@ export default function CAFlowDashboard() {
                   {(stats?.totalExceptions || 0) > 9 ? '9+' : stats?.totalExceptions || 0}
                 </span>
               </button>
-              <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-medium">CA</div>
+              <UserMenu />
             </div>
           </div>
 

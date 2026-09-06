@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { getRequestTenant } from '@/lib/auth';
 import * as XLSX from 'xlsx';
 
 function escapeXml(s: string): string {
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
   try {
     const db = getDb();
     const { searchParams } = new URL(request.url);
-    const tenantId = searchParams.get('tenantId') || 'default-tenant';
+    const tenantId = getRequestTenant(request);
     const clientId = searchParams.get('clientId');
     const format = (searchParams.get('format') || 'excel').toLowerCase(); // excel | tally
     const reconId = searchParams.get('reconciliationId');

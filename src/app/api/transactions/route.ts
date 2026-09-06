@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { getRequestTenant } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,7 +8,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get('clientId');
     const status = searchParams.get('status');
-    const tenantId = searchParams.get('tenantId') || 'default-tenant';
+    const tenantId = getRequestTenant(request);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = (page - 1) * limit;
@@ -43,6 +44,7 @@ export async function PATCH(request: NextRequest) {
     const db = getDb();
     const body = await request.json();
     const { id, category, status, description } = body;
+    const tenantId = getRequestTenant(request);
 
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
@@ -56,9 +58,9 @@ export async function PATCH(request: NextRequest) {
     if (updates.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
 
     updates.push("updated_at = datetime('now')");
-    params.push(id);
+    params.push(id, tenantId);
 
-    db.prepare(`UPDATE transactions SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    db.prepare(`UPDATE transactions SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`).run(...params);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

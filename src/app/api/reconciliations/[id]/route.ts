@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runReconciliation } from '@/lib/reconciliation';
+import { getRequestTenant } from '@/lib/auth';
 
 export async function POST(
   request: NextRequest,
@@ -7,6 +8,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const tenantId = getRequestTenant(request);
+    const { getDb } = await import('@/lib/db');
+    const owner = getDb().prepare('SELECT id FROM reconciliations WHERE id = ? AND tenant_id = ?').get(id, tenantId) as any;
+    if (!owner) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const result = runReconciliation(id);
 
     return NextResponse.json({
@@ -31,8 +36,9 @@ export async function GET(
     const { getDb } = await import('@/lib/db');
     const db = getDb();
     const { id } = await params;
+    const tenantId = getRequestTenant(request);
 
-    const recon = db.prepare('SELECT * FROM reconciliations WHERE id = ?').get(id) as any;
+    const recon = db.prepare('SELECT * FROM reconciliations WHERE id = ? AND tenant_id = ?').get(id, tenantId) as any;
     if (!recon) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const exceptions = db.prepare('SELECT * FROM exceptions WHERE reconciliation_id = ?').all(id);

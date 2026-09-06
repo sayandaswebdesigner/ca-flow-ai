@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { getRequestTenant } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 
 export async function GET(request: NextRequest) {
   try {
     const db = getDb();
     const { searchParams } = new URL(request.url);
-    const tenantId = searchParams.get('tenantId') || 'default-tenant';
+    const tenantId = getRequestTenant(request);
 
     const total = (db.prepare('SELECT COUNT(*) as c FROM visits WHERE tenant_id = ?').get(tenantId) as any).c as number;
     const unique = (db.prepare('SELECT COUNT(DISTINCT ip) as c FROM visits WHERE tenant_id = ?').get(tenantId) as any).c as number;
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
   try {
     const db = getDb();
     const body = await request.json().catch(() => ({}));
-    const tenantId = body.tenantId || 'default-tenant';
+    const tenantId = getRequestTenant(request);
     const path = (body.path || request.nextUrl.pathname).slice(0, 200);
 
     const hdr = request.headers;

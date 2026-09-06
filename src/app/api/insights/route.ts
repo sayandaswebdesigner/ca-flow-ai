@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { getRequestTenant } from '@/lib/auth';
 import { detectAnomalies, explainTransaction, computeHealthScores } from '@/lib/insights';
 
 export async function GET(request: NextRequest) {
   try {
     const db = getDb();
     const { searchParams } = new URL(request.url);
-    const tenantId = searchParams.get('tenantId') || 'default-tenant';
+    const tenantId = getRequestTenant(request);
 
     const transactions = db
       .prepare('SELECT * FROM transactions WHERE tenant_id = ? ORDER BY date DESC LIMIT 500')

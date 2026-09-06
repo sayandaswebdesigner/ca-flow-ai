@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { getRequestTenant } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
     const clientId = formData.get('clientId') as string;
-    const tenantId = (formData.get('tenantId') as string) || 'default-tenant';
+    const tenantId = getRequestTenant(request);
 
     if (!files.length) return NextResponse.json({ error: 'No files provided' }, { status: 400 });
     if (!clientId) return NextResponse.json({ error: 'Select a client first' }, { status: 400 });
@@ -169,7 +170,7 @@ export async function GET(request: NextRequest) {
     const db = getDb();
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get('clientId');
-    const tenantId = searchParams.get('tenantId') || 'default-tenant';
+    const tenantId = getRequestTenant(request);
 
     let query = 'SELECT * FROM documents WHERE tenant_id = ?';
     const params: any[] = [tenantId];
@@ -190,7 +191,7 @@ export async function DELETE(request: NextRequest) {
     const db = getDb();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const tenantId = searchParams.get('tenantId') || 'default-tenant';
+    const tenantId = getRequestTenant(request);
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
     const doc = db.prepare('SELECT * FROM documents WHERE id = ? AND tenant_id = ?').get(id, tenantId) as any;
     if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
