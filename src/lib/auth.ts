@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
-import { getDb } from './db';
+import { getDbAsync } from './db';
 import { v4 as uuid } from 'uuid';
 
 export const SESSION_COOKIE = 'ca_session';
@@ -34,25 +34,26 @@ export function validatePassword(password: string): string | null {
   return null;
 }
 
-export function createSession(userId: string): string {
-  const db = getDb();
+export async function createSession(userId: string): Promise<string> {
+  const db = await getDbAsync();
   const token = randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, userId, expires);
+  await db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, userId, expires);
   return token;
 }
 
-export function destroySession(token: string) {
+export async function destroySession(token: string) {
   try {
-    getDb().prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    const db = await getDbAsync();
+    await db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
   } catch {}
 }
 
-export function getSessionUser(token: string | undefined | null): SessionUser | null {
+export async function getSessionUser(token: string | undefined | null): Promise<SessionUser | null> {
   if (!token) return null;
   try {
-    const db = getDb();
-    const row = db
+    const db = await getDbAsync();
+    const row = await db
       .prepare(
         `SELECT u.id, u.tenant_id as tenantId, u.name, u.email, s.expires_at as expiresAt
          FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`
@@ -60,7 +61,7 @@ export function getSessionUser(token: string | undefined | null): SessionUser | 
       .get(token) as any;
     if (!row) return null;
     if (new Date(row.expiresAt).getTime() < Date.now()) {
-      db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+      await db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
       return null;
     }
     return { id: row.id, tenantId: row.tenantId, name: row.name, email: row.email };
@@ -74,18 +75,17 @@ export function getTokenFromRequest(request: NextRequest): string | null {
 }
 
 /** Tenant for data APIs: session tenant if logged in, else anonymous tenant from header. */
-export function getRequestTenant(request: NextRequest): string {
-  const user = getSessionUser(getTokenFromRequest(request));
+export async function getRequestTenant(request: NextRequest): Promise<string> {
+  const user = await getSessionUser(getTokenFromRequest(request));
   if (user) return user.tenantId;
-  // Anonymous tenant from header (set by frontend localStorage)
   const anonTenant = request.headers.get('x-anonymous-tenant');
   if (anonTenant) return anonTenant;
   return request.nextUrl.searchParams.get('tenantId') || 'default-tenant';
 }
 
 /** Strict: require login, throws Response on failure. */
-export function requireUser(request: NextRequest): SessionUser {
-  const user = getSessionUser(getTokenFromRequest(request));
+export async function requireUser(request: NextRequest): Promise<SessionUser> {
+  const user = await getSessionUser(getTokenFromRequest(request));
   if (!user) throw new Response(JSON.stringify({ error: 'Unauthorized — please log in' }), { status: 401 });
   return user;
 }
@@ -95,17 +95,17 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   return getSessionUser(store.get(SESSION_COOKIE)?.value);
 }
 
-export function ensureTenant(db: any, tenantId: string, name = 'My Firm') {
-  const t = db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId);
-  if (!t) db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, name, 'professional');
+export async function ensureTenant(db: any, tenantId: string, name = 'My Firm') {
+  const t = await db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId);
+  if (!t) await db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, name, 'professional');
 }
 
-export function createUserWithTenant(name: string, email: string, passwordHash: string): SessionUser {
-  const db = getDb();
+export async function createUserWithTenant(name: string, email: string, passwordHash: string): Promise<SessionUser> {
+  const db = await getDbAsync();
   const tenantId = uuid();
-  db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, `${name}'s Firm`, 'professional');
+  await db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, `${name}'s Firm`, 'professional');
   const id = uuid();
-  db.prepare('INSERT INTO users (id, tenant_id, name, email, password_hash) VALUES (?, ?, ?, ?, ?)').run(
+  await db.prepare('INSERT INTO users (id, tenant_id, name, email, password_hash) VALUES (?, ?, ?, ?, ?)').run(
     id,
     tenantId,
     name.trim(),

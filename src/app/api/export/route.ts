@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDbAsync } from '@/lib/db';
 import { getRequestTenant } from '@/lib/auth';
 import * as XLSX from 'xlsx';
 
@@ -59,9 +59,9 @@ ${vouchers}
 
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getDbAsync();
     const { searchParams } = new URL(request.url);
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
     const clientId = searchParams.get('clientId');
     const format = (searchParams.get('format') || 'excel').toLowerCase(); // excel | tally
     const reconId = searchParams.get('reconciliationId');

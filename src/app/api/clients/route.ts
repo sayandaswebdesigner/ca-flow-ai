@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDbAsync } from '@/lib/db';
 import { getRequestTenant } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getDbAsync();
     const { searchParams } = new URL(request.url);
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
 
     const clients = db.prepare('SELECT * FROM clients WHERE tenant_id = ? ORDER BY name').all(tenantId);
     return NextResponse.json({ clients });
@@ -18,10 +18,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getDbAsync();
     const body = await request.json();
     const { name, gstin, pan, email, phone, tenantId: _bodyTenantId = 'default-tenant' } = body;
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
 
     if (!name || !name.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 });
     if (name.trim().length < 2) return NextResponse.json({ error: 'Name too short' }, { status: 400 });
@@ -52,10 +52,10 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getDbAsync();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
     const hasDocs = db.prepare('SELECT id FROM documents WHERE client_id = ? LIMIT 1').get(id);
     if (hasDocs) return NextResponse.json({ error: 'Cannot delete: client has documents. Delete documents first.' }, { status: 400 });

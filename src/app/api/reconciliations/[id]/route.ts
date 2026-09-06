@@ -8,11 +8,11 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const tenantId = getRequestTenant(request);
-    const { getDb } = await import('@/lib/db');
-    const owner = getDb().prepare('SELECT id FROM reconciliations WHERE id = ? AND tenant_id = ?').get(id, tenantId) as any;
+    const tenantId = await getRequestTenant(request);
+    const { getDbAsync } = await import('@/lib/db');
+    const owner = (await getDbAsync()).prepare('SELECT id FROM reconciliations WHERE id = ? AND tenant_id = ?').get(id, tenantId) as any;
     if (!owner) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    const result = runReconciliation(id);
+    const result = await runReconciliation(id);
 
     return NextResponse.json({
       matchedCount: result.matched.length,
@@ -33,15 +33,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { getDb } = await import('@/lib/db');
-    const db = getDb();
+    const { getDbAsync } = await import('@/lib/db');
+    const db = await getDbAsync();
     const { id } = await params;
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
 
-    const recon = db.prepare('SELECT * FROM reconciliations WHERE id = ? AND tenant_id = ?').get(id, tenantId) as any;
+    const recon = await db.prepare('SELECT * FROM reconciliations WHERE id = ? AND tenant_id = ?').get(id, tenantId) as any;
     if (!recon) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const exceptions = db.prepare('SELECT * FROM exceptions WHERE reconciliation_id = ?').all(id);
+    const exceptions = await db.prepare('SELECT * FROM exceptions WHERE reconciliation_id = ?').all(id);
 
     const sourceADocIds = JSON.parse(recon.source_a_doc_ids || '[]');
     const sourceBDocIds = JSON.parse(recon.source_b_doc_ids || '[]');
@@ -50,13 +50,13 @@ export async function GET(
     let sourceBTransactions: any[] = [];
 
     if (sourceADocIds.length > 0) {
-      sourceATransactions = db.prepare(
-        `SELECT * FROM transactions WHERE source_document_id IN (${sourceADocIds.map(() => '?').join(',')})`
+      sourceATransactions = await db.prepare(
+        `SELECT * FROM transactions WHERE source_document_id IN (${sourceADocIds.map((_: any, i: number) => `$${i + 1}`).join(',')})`
       ).all(...sourceADocIds);
     }
     if (sourceBDocIds.length > 0) {
-      sourceBTransactions = db.prepare(
-        `SELECT * FROM transactions WHERE source_document_id IN (${sourceBDocIds.map(() => '?').join(',')})`
+      sourceBTransactions = await db.prepare(
+        `SELECT * FROM transactions WHERE source_document_id IN (${sourceBDocIds.map((_: any, i: number) => `$${i + 1}`).join(',')})`
       ).all(...sourceBDocIds);
     }
 

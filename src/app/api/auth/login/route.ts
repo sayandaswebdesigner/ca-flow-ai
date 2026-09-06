@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDbAsync } from '@/lib/db';
 import { verifyPassword, validateEmail, createSession, SESSION_COOKIE } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     if (!email || !validateEmail(email)) return NextResponse.json({ error: 'Valid email required' }, { status: 400 });
     if (!password) return NextResponse.json({ error: 'Password required' }, { status: 400 });
 
-    const db = getDb();
+    const db = await getDbAsync();
     const user = db.prepare('SELECT id, tenant_id as tenantId, name, email, password_hash as passwordHash FROM users WHERE email = ?').get(
       email.trim().toLowerCase()
     ) as any;
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
 
-    const token = createSession(user.id);
+    const token = await createSession(user.id);
     const res = NextResponse.json({ success: true, user: { id: user.id, name: user.name, email: user.email } });
     res.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true,

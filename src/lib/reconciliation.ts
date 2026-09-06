@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDbAsync } from './db';
 import { v4 as uuid } from 'uuid';
 
 export interface MatchResult {
@@ -8,20 +8,20 @@ export interface MatchResult {
   exceptions: { type: string; description: string; sourceAId?: string; sourceBId?: string }[];
 }
 
-export function runReconciliation(reconciliationId: string): MatchResult {
-  const db = getDb();
-  const recon = db.prepare('SELECT * FROM reconciliations WHERE id = ?').get(reconciliationId) as any;
+export async function runReconciliation(reconciliationId: string): Promise<MatchResult> {
+  const db = await getDbAsync();
+  const recon = await db.prepare('SELECT * FROM reconciliations WHERE id = ?').get(reconciliationId) as any;
   if (!recon) throw new Error('Reconciliation not found');
 
   const sourceADocIds = JSON.parse(recon.source_a_doc_ids || '[]');
   const sourceBDocIds = JSON.parse(recon.source_b_doc_ids || '[]');
 
-  const sourceA = db.prepare(
-    `SELECT * FROM transactions WHERE source_document_id IN (${sourceADocIds.map(() => '?').join(',')})`
+  const sourceA = await db.prepare(
+    `SELECT * FROM transactions WHERE source_document_id IN (${sourceADocIds.map((_: any, i: number) => `$${i + 1}`).join(',')})`
   ).all(...sourceADocIds) as any[];
   
-  const sourceB = db.prepare(
-    `SELECT * FROM transactions WHERE source_document_id IN (${sourceBDocIds.map(() => '?').join(',')})`
+  const sourceB = await db.prepare(
+    `SELECT * FROM transactions WHERE source_document_id IN (${sourceBDocIds.map((_: any, i: number) => `$${i + 1}`).join(',')})`
   ).all(...sourceBDocIds) as any[];
 
   const matched: MatchResult['matched'] = [];
@@ -29,7 +29,7 @@ export function runReconciliation(reconciliationId: string): MatchResult {
   const unmatchedB = new Set(sourceB.map((t) => t.id));
   const exceptions: MatchResult['exceptions'] = [];
 
-  const rules = db.prepare('SELECT * FROM matching_rules WHERE tenant_id = ? AND is_active = 1 ORDER BY priority')
+  const rules = await db.prepare('SELECT * FROM matching_rules WHERE tenant_id = ? AND is_active = 1 ORDER BY priority')
     .all(recon.tenant_id) as any[];
 
   // Phase 1: Exact matches (amount + reference)
@@ -129,17 +129,17 @@ export function runReconciliation(reconciliationId: string): MatchResult {
   const totalUnmatchedA = sourceA.filter((t) => unmatchedA.has(t.id)).reduce((sum, t) => sum + Math.abs(t.amount), 0);
   const totalUnmatchedB = sourceB.filter((t) => unmatchedB.has(t.id)).reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE reconciliations SET
       status = 'completed',
-      matched_count = ?,
-      unmatched_a_count = ?,
-      unmatched_b_count = ?,
-      exception_count = ?,
-      matched_amount = ?,
-      unreconciled_amount = ?,
-      completed_at = datetime('now')
-    WHERE id = ?
+      matched_count = $1,
+      unmatched_a_count = $2,
+      unmatched_b_count = $3,
+      exception_count = $4,
+      matched_amount = $5,
+      unreconciled_amount = $6,
+      completed_at = NOW()
+    WHERE id = $7
   `).run(
     matched.length,
     unmatchedA.size,
@@ -152,26 +152,25 @@ export function runReconciliation(reconciliationId: string): MatchResult {
 
   // Update transaction statuses
   for (const m of matched) {
-    db.prepare('UPDATE transactions SET status = ?, matched_transaction_id = ?, reconciliation_id = ? WHERE id = ?')
+    await db.prepare('UPDATE transactions SET status = $1, matched_transaction_id = $2, reconciliation_id = $3 WHERE id = $4')
       .run('matched', m.sourceB, reconciliationId, m.sourceA);
-    db.prepare('UPDATE transactions SET status = ?, matched_transaction_id = ?, reconciliation_id = ? WHERE id = ?')
+    await db.prepare('UPDATE transactions SET status = $1, matched_transaction_id = $2, reconciliation_id = $3 WHERE id = $4')
       .run('matched', m.sourceA, reconciliationId, m.sourceB);
   }
   for (const id of unmatchedA) {
-    db.prepare('UPDATE transactions SET status = ?, reconciliation_id = ? WHERE id = ?')
+    await db.prepare('UPDATE transactions SET status = $1, reconciliation_id = $2 WHERE id = $3')
       .run('exception', reconciliationId, id);
   }
   for (const id of unmatchedB) {
-    db.prepare('UPDATE transactions SET status = ?, reconciliation_id = ? WHERE id = ?')
+    await db.prepare('UPDATE transactions SET status = $1, reconciliation_id = $2 WHERE id = $3')
       .run('exception', reconciliationId, id);
   }
 
   // Save exceptions
-  const insertException = db.prepare(
-    'INSERT INTO exceptions (id, reconciliation_id, type, description, source_a_id, source_b_id) VALUES (?, ?, ?, ?, ?, ?)'
-  );
   for (const ex of exceptions) {
-    insertException.run(uuid(), reconciliationId, ex.type, ex.description, ex.sourceAId || null, ex.sourceBId || null);
+    await db.prepare(
+      'INSERT INTO exceptions (id, reconciliation_id, type, description, source_a_id, source_b_id) VALUES ($1, $2, $3, $4, $5, $6)'
+    ).run(uuid(), reconciliationId, ex.type, ex.description, ex.sourceAId || null, ex.sourceBId || null);
   }
 
   return { matched, unmatchedA: Array.from(unmatchedA), unmatchedB: Array.from(unmatchedB), exceptions };

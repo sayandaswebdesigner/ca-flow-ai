@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDbAsync } from '@/lib/db';
 import { getRequestTenant } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 import { writeFile, mkdir, unlink } from 'fs/promises';
@@ -47,12 +47,12 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
     const clientId = formData.get('clientId') as string;
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
 
     if (!files.length) return NextResponse.json({ error: 'No files provided' }, { status: 400 });
     if (!clientId) return NextResponse.json({ error: 'Select a client first' }, { status: 400 });
 
-    const db = getDb();
+    const db = await getDbAsync();
     ensureTenant(db, tenantId);
 
     const client = db.prepare('SELECT id FROM clients WHERE id = ? AND tenant_id = ?').get(clientId, tenantId);
@@ -167,10 +167,10 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getDbAsync();
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get('clientId');
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
 
     let query = 'SELECT * FROM documents WHERE tenant_id = ?';
     const params: any[] = [tenantId];
@@ -188,10 +188,10 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getDbAsync();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
     const doc = db.prepare('SELECT * FROM documents WHERE id = ? AND tenant_id = ?').get(id, tenantId) as any;
     if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });

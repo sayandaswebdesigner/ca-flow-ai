@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDbAsync } from '@/lib/db';
 import { getRequestTenant } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getDbAsync();
     const { searchParams } = new URL(request.url);
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
     const limit = Math.min(100, parseInt(searchParams.get('limit') || '50'));
 
     const reviews = db
@@ -34,10 +34,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getDbAsync();
     const body = await request.json();
     const { rating, text, author_name, author_role, clientId, source = 'in_app' } = body;
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
 
     const r = Number(rating);
     if (!r || r < 1 || r > 5) return NextResponse.json({ error: 'Rating 1-5 required' }, { status: 400 });

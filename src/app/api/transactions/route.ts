@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDbAsync } from '@/lib/db';
 import { getRequestTenant } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getDbAsync();
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get('clientId');
     const status = searchParams.get('status');
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = (page - 1) * limit;
@@ -41,10 +41,10 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getDbAsync();
     const body = await request.json();
     const { id, category, status, description } = body;
-    const tenantId = getRequestTenant(request);
+    const tenantId = await getRequestTenant(request);
 
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
