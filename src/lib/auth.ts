@@ -73,10 +73,13 @@ export function getTokenFromRequest(request: NextRequest): string | null {
   return request.cookies.get(SESSION_COOKIE)?.value || null;
 }
 
-/** Tenant for data APIs: session tenant if logged in, else legacy default-tenant (back-compat). */
+/** Tenant for data APIs: session tenant if logged in, else anonymous tenant from header. */
 export function getRequestTenant(request: NextRequest): string {
   const user = getSessionUser(getTokenFromRequest(request));
   if (user) return user.tenantId;
+  // Anonymous tenant from header (set by frontend localStorage)
+  const anonTenant = request.headers.get('x-anonymous-tenant');
+  if (anonTenant) return anonTenant;
   return request.nextUrl.searchParams.get('tenantId') || 'default-tenant';
 }
 

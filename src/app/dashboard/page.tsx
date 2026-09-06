@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   LayoutDashboard,
   FileText,
@@ -28,10 +28,20 @@ import {
   Zap,
   Activity,
   Layers,
+  Puzzle,
+  Bot,
+  Mail,
+  Table2,
+  Wifi,
+  CloudUpload,
+  Link2,
+  Send,
+  UserPlus,
+  PackageOpen,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
-type View = 'dashboard' | 'documents' | 'transactions' | 'reconciliations' | 'clients' | 'insights' | 'reviews';
+type View = 'dashboard' | 'documents' | 'transactions' | 'reconciliations' | 'clients' | 'insights' | 'reviews' | 'plugins' | 'assistant';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview' },
@@ -41,11 +51,30 @@ const NAV_ITEMS = [
   { id: 'clients', label: 'Clients', icon: Users, desc: 'Manage' },
   { id: 'insights', label: 'Smart Insights', icon: ShieldAlert, desc: 'Anomaly radar' },
   { id: 'reviews', label: 'Reviews', icon: Sparkles, desc: 'Wall & capture' },
+  { id: 'plugins', label: 'Plugins', icon: Puzzle, desc: 'Integrations' },
+  { id: 'assistant', label: 'Assistant', icon: Bot, desc: 'AI chat' },
 ] as const;
 
 // ---------- helpers ----------
 const INR = (n: number) => `₹${Math.abs(n).toLocaleString('en-IN')}`;
 const cls = (...a: (string | false | undefined)[]) => a.filter(Boolean).join(' ');
+
+function getAnonTenant(): string {
+  if (typeof window === 'undefined') return '';
+  let t = localStorage.getItem('ca_anon_tenant');
+  if (!t) {
+    t = 'anon-' + Math.random().toString(36).slice(2, 10) + '-' + Date.now().toString(36);
+    localStorage.setItem('ca_anon_tenant', t);
+  }
+  return t;
+}
+
+function getAnonHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const user = localStorage.getItem('ca_logged_in');
+  if (user === 'true') return {};
+  return { 'x-anonymous-tenant': getAnonTenant() };
+}
 
 function UserMenu() {
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
@@ -54,43 +83,300 @@ function UserMenu() {
   useEffect(() => {
     fetch('/api/auth/me')
       .then((r) => r.json())
-      .then((d) => setUser(d.user))
-      .catch(() => {});
+      .then((d) => {
+        if (d.user) {
+          setUser(d.user);
+          localStorage.setItem('ca_logged_in', 'true');
+        } else {
+          localStorage.setItem('ca_logged_in', 'false');
+        }
+      })
+      .catch(() => localStorage.setItem('ca_logged_in', 'false'));
   }, []);
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
+    localStorage.setItem('ca_logged_in', 'false');
     window.location.href = '/login';
   }
 
-  const initials = user ? user.name.slice(0, 2).toUpperCase() : 'CA';
+  const initials = user ? user.name.slice(0, 2).toUpperCase() : 'U';
 
   return (
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
         className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-medium hover:bg-slate-700"
-        title={user ? `${user.name} (${user.email})` : 'Account'}
+        title={user ? `${user.name} (${user.email})` : 'Sign in to save progress'}
       >
         {initials}
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-2 w-60 rounded-2xl bg-white border border-slate-200 shadow-xl z-40 overflow-hidden animate-fadeIn">
-            <div className="px-4 py-3 border-b border-slate-100">
-              <p className="text-sm font-semibold truncate">{user?.name || 'Loading…'}</p>
-              <p className="text-xs text-slate-500 truncate">{user?.email || ''}</p>
-            </div>
-            <button
-              onClick={logout}
-              className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 font-medium"
-            >
-              Log out
-            </button>
+          <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border border-slate-200 shadow-xl z-40 overflow-hidden animate-fadeIn">
+            {user ? (
+              <>
+                <div className="px-4 py-3 border-b border-slate-100">
+                  <p className="text-sm font-semibold truncate">{user.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                </div>
+                <button onClick={logout} className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 font-medium">
+                  Log out
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="px-4 py-3 border-b border-slate-100">
+                  <p className="text-sm font-semibold">Guest user</p>
+                  <p className="text-xs text-slate-500">Data is stored locally</p>
+                </div>
+                <a href="/signup" className="block px-4 py-2.5 text-sm text-indigo-600 hover:bg-indigo-50 font-medium">
+                  Sign up — save permanently
+                </a>
+                <a href="/login" className="block px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 font-medium">
+                  Log in
+                </a>
+              </>
+            )}
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// ==================== PLUGINS VIEW ====================
+function PluginsView() {
+  const [installed, setInstalled] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    try { return JSON.parse(localStorage.getItem('ca_plugins') || '{}'); } catch { return {}; }
+  });
+
+  function togglePlugin(id: string) {
+    const next = { ...installed, [id]: !installed[id] };
+    setInstalled(next);
+    localStorage.setItem('ca_plugins', JSON.stringify(next));
+  }
+
+  const plugins = [
+    {
+      id: 'excel',
+      name: 'Excel Import',
+      desc: 'Import bank statements, ledgers, and reports from .xlsx/.xls files directly.',
+      icon: Table2,
+      color: 'from-emerald-500 to-teal-600',
+      bg: 'bg-emerald-50',
+      border: 'border-emerald-200',
+      status: 'Built-in',
+    },
+    {
+      id: 'tally',
+      name: 'Tally Export',
+      desc: 'Export reconciled transactions to Tally ERP XML format for direct import.',
+      icon: FileSpreadsheet,
+      color: 'from-blue-500 to-indigo-600',
+      bg: 'bg-blue-50',
+      border: 'border-blue-200',
+      status: 'Built-in',
+    },
+    {
+      id: 'gmail',
+      name: 'Gmail Sync',
+      desc: 'Connect Gmail to auto-import bank statements and invoices from email attachments.',
+      icon: Mail,
+      color: 'from-red-500 to-rose-600',
+      bg: 'bg-red-50',
+      border: 'border-red-200',
+      status: 'Connect',
+    },
+    {
+      id: 'whatsapp',
+      name: 'WhatsApp Business',
+      desc: 'Send reconciliation reminders and payment chase messages to clients via WhatsApp.',
+      icon: MessageCircle,
+      color: 'from-green-500 to-emerald-600',
+      bg: 'bg-green-50',
+      border: 'border-green-200',
+      status: 'Built-in',
+    },
+    {
+      id: 'gst',
+      name: 'GST Portal',
+      desc: 'Auto-fetch GSTR-1/GSTR-3B data and match with your books for GST reconciliation.',
+      icon: Building2,
+      color: 'from-violet-500 to-purple-600',
+      bg: 'bg-violet-50',
+      border: 'border-violet-200',
+      status: 'Coming Soon',
+    },
+    {
+      id: 'cloud',
+      name: 'Cloud Storage',
+      desc: 'Sync documents with Google Drive, Dropbox, or OneDrive for automatic backup.',
+      icon: CloudUpload,
+      color: 'from-cyan-500 to-blue-600',
+      bg: 'bg-cyan-50',
+      border: 'border-cyan-200',
+      status: 'Coming Soon',
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl mesh-hero p-6 lg:p-8 text-white relative overflow-hidden shadow-xl">
+        <div className="absolute -right-10 -top-10 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+        <div className="relative">
+          <p className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/15 border border-white/20 font-medium">
+            <Puzzle size={14} /> Plugin Marketplace
+          </p>
+          <h3 className="text-2xl font-semibold mt-3">Extend CA-Flow</h3>
+          <p className="text-indigo-100 text-sm mt-1 max-w-xl">Connect your existing tools — Gmail, Tally, WhatsApp, and more. One-click integrations.</p>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {plugins.map((p) => (
+          <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm card-hover flex flex-col">
+            <div className="flex items-start gap-3">
+              <div className={`w-11 h-11 rounded-xl ${p.bg} border ${p.border} flex items-center justify-center flex-shrink-0`}>
+                <p.icon size={20} className="text-slate-700" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-sm">{p.name}</h4>
+                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{p.desc}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-2">
+              {p.status === 'Built-in' ? (
+                <button
+                  onClick={() => togglePlugin(p.id)}
+                  className={cls(
+                    'flex-1 py-2 rounded-xl text-xs font-semibold transition-all',
+                    installed[p.id]
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                      : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm'
+                  )}
+                >
+                  {installed[p.id] ? '✓ Installed' : 'Install'}
+                </button>
+              ) : p.status === 'Connect' ? (
+                <button className="flex-1 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all">
+                  <Link2 size={14} className="inline mr-1" /> Connect
+                </button>
+              ) : (
+                <span className="flex-1 py-2 rounded-xl bg-slate-50 border border-slate-100 text-xs font-medium text-slate-400 text-center">
+                  Coming Soon
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ==================== CHATBOT VIEW ====================
+function ChatbotView({ messages, input, setInput, onSend, loading, chatEndRef }: {
+  messages: { role: 'user' | 'bot'; text: string }[];
+  input: string;
+  setInput: (v: string) => void;
+  onSend: () => void;
+  loading: boolean;
+  chatEndRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const suggestions = [
+    'Show transactions',
+    'Create client',
+    'Upload documents',
+    'Export excel',
+    'Show insights',
+    'Help',
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl mesh-hero p-6 lg:p-8 text-white relative overflow-hidden shadow-xl">
+        <div className="absolute -right-10 -top-10 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+        <div className="relative">
+          <p className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/15 border border-white/20 font-medium">
+            <Bot size={14} /> AI Assistant
+          </p>
+          <h3 className="text-2xl font-semibold mt-3">CA-Flow Assistant</h3>
+          <p className="text-indigo-100 text-sm mt-1 max-w-xl">Ask me to navigate views, create clients, upload documents, or export data.</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col" style={{ height: '500px' }}>
+        {/* Messages */}
+        <div className="flex-1 overflow-auto p-4 space-y-3">
+          {messages.length === 0 && (
+            <div className="text-center py-12">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto">
+                <Bot size={28} className="text-indigo-600" />
+              </div>
+              <p className="font-semibold mt-4">How can I help?</p>
+              <p className="text-sm text-slate-500 mt-1">Try one of these commands:</p>
+              <div className="mt-4 flex flex-wrap gap-2 justify-center max-w-md mx-auto">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setInput(s)}
+                    className="px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-700 transition-colors"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {messages.map((m, i) => (
+            <div key={i} className={cls('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+              <div className={cls(
+                'max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line',
+                m.role === 'user'
+                  ? 'bg-indigo-600 text-white rounded-br-md'
+                  : 'bg-slate-100 text-slate-800 rounded-bl-md'
+              )}>
+                {m.text}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-slate-100 px-4 py-3 rounded-2xl rounded-bl-md">
+                <div className="flex gap-1.5">
+                  <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="border-t border-slate-200 p-3">
+          <div className="flex gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onSend()}
+              placeholder="Type a command… (e.g. show transactions)"
+              className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-200"
+            />
+            <button
+              onClick={onSend}
+              disabled={!input.trim() || loading}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition-colors shadow-sm"
+            >
+              <Send size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -113,6 +399,13 @@ export default function CAFlowDashboard() {
   const [showClientModal, setShowClientModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState<{ open: boolean; rating: number; text: string; draft: string }>({ open: false, rating: 5, text: '', draft: '' });
   const [headerRating, setHeaderRating] = useState(0);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showSignupWarning, setShowSignupWarning] = useState(false);
+  const [signupWarningDismissed, setSignupWarningDismissed] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'bot'; text: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   function notify(msg: string) {
     setToast(msg);
@@ -122,15 +415,16 @@ export default function CAFlowDashboard() {
   async function loadAll() {
     setLoading(true);
     try {
+      const h = getAnonHeaders();
       const [statsRes, docsRes, txRes, reconsRes, clientsRes, insightsRes, reviewsRes, visitsRes] = await Promise.all([
-        fetch('/api/reports'),
-        fetch('/api/documents'),
-        fetch('/api/transactions?limit=200'),
-        fetch('/api/reconciliations'),
-        fetch('/api/clients'),
-        fetch('/api/insights'),
-        fetch('/api/reviews?limit=50'),
-        fetch('/api/visits'),
+        fetch('/api/reports', { headers: h }),
+        fetch('/api/documents', { headers: h }),
+        fetch('/api/transactions?limit=200', { headers: h }),
+        fetch('/api/reconciliations', { headers: h }),
+        fetch('/api/clients', { headers: h }),
+        fetch('/api/insights', { headers: h }),
+        fetch('/api/reviews?limit=50', { headers: h }),
+        fetch('/api/visits', { headers: h }),
       ]);
       const [statsData, docsData, txData, reconsData, clientsData, insightsData, reviewsData, visitsData] = await Promise.all([
         statsRes.json(),
@@ -157,19 +451,49 @@ export default function CAFlowDashboard() {
     setLoading(false);
   }
 
-  // auto-log visit once per mount (huge quantity: every pageview counted, deduped server-side 5min)
+  // auto-log visit once per mount + detect login state
   useEffect(() => {
+    fetch('/api/auth/me').then(r => r.json()).then(d => {
+      const loggedIn = !!d.user;
+      setIsLoggedIn(loggedIn);
+      localStorage.setItem('ca_logged_in', loggedIn ? 'true' : 'false');
+    }).catch(() => {});
+
+    const h = getAnonHeaders();
     fetch('/api/visits', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...h },
       body: JSON.stringify({ path: typeof window !== 'undefined' ? window.location.pathname : '/dashboard' }),
     }).catch(() => {});
+
+    // Check if signup warning was dismissed
+    const dismissed = localStorage.getItem('ca_signup_warning_dismissed');
+    if (dismissed === 'true') setSignupWarningDismissed(true);
   }, []);
 
+  // Tab-close warning for anonymous users
+  useEffect(() => {
+    if (isLoggedIn || signupWarningDismissed) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isLoggedIn, signupWarningDismissed]);
+
+  // Show signup warning banner after 10s for anonymous users
+  useEffect(() => {
+    if (isLoggedIn || signupWarningDismissed) return;
+    const timer = setTimeout(() => setShowSignupWarning(true), 10000);
+    return () => clearTimeout(timer);
+  }, [isLoggedIn, signupWarningDismissed]);
+
   async function submitReview(rating: number, text: string, source = 'in_app') {
+    const h = getAnonHeaders();
     const res = await fetch('/api/reviews', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...h },
       body: JSON.stringify({ rating, text, author_name: 'CA User', source }),
     });
     const data = await res.json();
@@ -202,7 +526,8 @@ export default function CAFlowDashboard() {
     const fd = new FormData();
     for (let i = 0; i < files.length; i++) fd.append('files', files[i]);
     fd.append('clientId', clientId);
-    const res = await fetch('/api/documents', { method: 'POST', body: fd });
+    const h = getAnonHeaders();
+    const res = await fetch('/api/documents', { method: 'POST', headers: h, body: fd });
     const data = await res.json();
     if (!res.ok) {
       notify(data.error || 'Upload failed');
@@ -214,7 +539,8 @@ export default function CAFlowDashboard() {
   }
 
   async function runReconciliation(reconId: string) {
-    const res = await fetch(`/api/reconciliations/${reconId}`, { method: 'POST' });
+    const h = getAnonHeaders();
+    const res = await fetch(`/api/reconciliations/${reconId}`, { method: 'POST', headers: h });
     const data = await res.json();
     if (!res.ok) {
       notify(data.error || 'Reconciliation failed');
@@ -237,8 +563,105 @@ export default function CAFlowDashboard() {
     );
   }, [transactions, query]);
 
+  // Chatbot command handler
+  const handleChat = useCallback(async () => {
+    const msg = chatInput.trim();
+    if (!msg) return;
+    setChatMessages((prev) => [...prev, { role: 'user', text: msg }]);
+    setChatInput('');
+    setChatLoading(true);
+
+    const lower = msg.toLowerCase();
+    let response = '';
+
+    try {
+      if (lower.includes('show') && lower.includes('transaction')) {
+        setView('transactions');
+        response = `Switched to Transactions view. ${transactions.length} transactions loaded.`;
+      } else if (lower.includes('show') && lower.includes('client')) {
+        setView('clients');
+        response = `Switched to Clients view. ${clients.length} clients found.`;
+      } else if (lower.includes('show') && lower.includes('document')) {
+        setView('documents');
+        response = `Switched to Documents view. ${documents.length} documents uploaded.`;
+      } else if (lower.includes('show') && lower.includes('reconcil')) {
+        setView('reconciliations');
+        response = `Switched to Reconciliations view. ${reconciliations.length} reconciliations.`;
+      } else if (lower.includes('show') && lower.includes('insight')) {
+        setView('insights');
+        response = 'Switched to Smart Insights view.';
+      } else if (lower.includes('show') && lower.includes('review')) {
+        setView('reviews');
+        response = 'Switched to Reviews view.';
+      } else if (lower.includes('show') && lower.includes('plugin')) {
+        setView('plugins');
+        response = 'Switched to Plugins view.';
+      } else if (lower.includes('create') && lower.includes('client')) {
+        setShowClientModal(true);
+        response = 'Opened the client creation form. Fill in the details and save.';
+      } else if (lower.includes('upload') || lower.includes('document')) {
+        setView('documents');
+        response = 'Switched to Documents. Click "Upload" to add files.';
+      } else if (lower.includes('reconcil') && lower.includes('run')) {
+        setView('reconciliations');
+        response = 'Switched to Reconciliations. Select a reconciliation and click Run.';
+      } else if (lower.includes('export') && lower.includes('excel')) {
+        response = 'Download your Excel export here: /api/export?format=excel';
+      } else if (lower.includes('export') && lower.includes('tally')) {
+        response = 'Download your Tally XML export here: /api/export?format=tally';
+      } else if (lower.includes('help') || lower.includes('what can you do')) {
+        response = `I can help you with:\n• "show transactions/clients/documents" — navigate views\n• "create client" — open client form\n• "upload documents" — go to upload\n• "run reconciliation" — go to reconciliations\n• "export excel/tally" — get export links\n• "show insights" — view Smart Insights\n• "show plugins" — view integrations\n• "stats" — show dashboard stats`;
+      } else if (lower.includes('stat') || lower.includes('overview')) {
+        setView('dashboard');
+        response = `Dashboard overview:\n• ${clients.length} clients\n• ${documents.length} documents\n• ${transactions.length} transactions\n• ${reconciliations.length} reconciliations\n• ${stats?.totalExceptions || 0} exceptions`;
+      } else if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
+        response = 'Hello! I\'m your CA-Flow assistant. Ask me to show views, create clients, upload documents, or export data.';
+      } else {
+        response = `I didn't understand "${msg}". Try:\n• "show transactions"\n• "create client"\n• "upload documents"\n• "export excel"\n• "help"`;
+      }
+    } catch (err) {
+      response = 'Something went wrong. Please try again.';
+    }
+
+    setChatMessages((prev) => [...prev, { role: 'bot', text: response }]);
+    setChatLoading(false);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+  }, [chatInput, transactions, clients, documents, reconciliations, stats]);
+
   return (
     <div className="min-h-screen text-slate-900 flex">
+      {/* Signup Warning Banner — anonymous users */}
+      {showSignupWarning && !isLoggedIn && !signupWarningDismissed && (
+        <div className="fixed top-0 left-0 right-0 z-50 animate-slideDown">
+          <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-b border-amber-200 px-4 py-3">
+            <div className="max-w-5xl mx-auto flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={18} className="text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-900">Your progress is not saved</p>
+                <p className="text-xs text-amber-700">Sign up to keep your data permanently. If you close this tab, everything will be lost.</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <a href="/signup" className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-sm transition-colors">
+                  Sign up free
+                </a>
+                <button
+                  onClick={() => {
+                    setShowSignupWarning(false);
+                    setSignupWarningDismissed(true);
+                    localStorage.setItem('ca_signup_warning_dismissed', 'true');
+                  }}
+                  className="px-3 py-2 rounded-xl border border-amber-200 hover:bg-amber-100 text-xs font-medium text-amber-700 transition-colors"
+                >
+                  I don't need it
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside className="hidden lg:flex w-[286px] bg-white/80 glass border-r border-slate-200 flex-col sticky top-0 h-screen">
         <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3">
@@ -416,6 +839,8 @@ export default function CAFlowDashboard() {
               {view === 'clients' && <ClientsView clients={clients} onRefresh={loadAll} showModal={showClientModal} setShowModal={setShowClientModal} />}
               {view === 'insights' && <InsightsView insights={insights} />}
               {view === 'reviews' && <ReviewsView reviews={reviews} visits={visits} onSubmit={submitReview} onRefresh={loadAll} />}
+              {view === 'plugins' && <PluginsView />}
+              {view === 'assistant' && <ChatbotView messages={chatMessages} input={chatInput} setInput={setChatInput} onSend={handleChat} loading={chatLoading} chatEndRef={chatEndRef} />}
             </>
           )}
         </main>

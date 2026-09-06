@@ -89,7 +89,7 @@ function SignupForm() {
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Sayan Das"
+                placeholder="e.g. Rajesh Kumar"
                 autoComplete="name"
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300"
               />
