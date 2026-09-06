@@ -154,3 +154,103 @@ body {
   mask-composite: exclude;
   pointer-events: none;
 }
+
+/* Irresistible review system */
+@keyframes star-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35) rotate(-8deg);
+  }
+  70% {
+    transform: scale(0.95) rotate(4deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.star-pop {
+  animation: star-pop 0.35s ease;
+}
+
+.star-glow {
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.8)) drop-shadow(0 0 14px rgba(251, 191, 36, 0.4));
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(251, 191, 36, 0);
+  }
+}
+.glow-pulse {
+  animation: glow-pulse 1.8s ease-out infinite;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(320px) rotate(720deg);
+    opacity: 0;
+  }
+}
+.confetti-piece {
+  position: absolute;
+  top: -12px;
+  animation: confetti-fall 2.2s ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes cta-shine {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+.cta-shine {
+  background: linear-gradient(120deg, #4f46e5, #7c3aed, #d946ef, #4f46e5);
+  background-size: 250% 250%;
+  animation: cta-shine 3s ease infinite;
+}
+
+@keyframes ticker-x {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+.ticker-track {
+  animation: ticker-x 22s linear infinite;
+}
+
+@keyframes badge-unlock {
+  0% {
+    transform: scale(0.4) rotate(-12deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15) rotate(3deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+.badge-unlock {
+  animation: badge-unlock 0.6s ease both;
+}

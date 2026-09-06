@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
     const r = Number(rating);
     if (!r || r < 1 || r > 5) return NextResponse.json({ error: 'Rating 1-5 required' }, { status: 400 });
     const cleanText = (text || '').toString().slice(0, 1000).trim();
-    // Micro-review allowed: rating only. If text provided, min 3 chars
+    // Genuine mode: require 20 chars for wall (micro header still allows rating-only but marked unverified)
+    const isWall = source === 'reviews_tab' || source === 'modal';
+    if (isWall && cleanText.length < 20) return NextResponse.json({ error: 'Genuine review needs at least 20 characters' }, { status: 400 });
     if (cleanText && cleanText.length < 3) return NextResponse.json({ error: 'Text too short' }, { status: 400 });
 
     // Ensure tenant

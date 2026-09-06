@@ -57,6 +57,7 @@ export default function CAFlowDashboard() {
   const [clients, setClients] = useState<any[]>([]);
   const [insights, setInsights] = useState<any>(null);
   const [reviews, setReviews] = useState<{ reviews: any[]; stats: { count: number; avg: number; dist: Record<number, number> } } | null>(null);
+  const [visits, setVisits] = useState<{ total: number; unique: number; today: number; last7: any[]; recent: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -73,7 +74,7 @@ export default function CAFlowDashboard() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [statsRes, docsRes, txRes, reconsRes, clientsRes, insightsRes, reviewsRes] = await Promise.all([
+      const [statsRes, docsRes, txRes, reconsRes, clientsRes, insightsRes, reviewsRes, visitsRes] = await Promise.all([
         fetch('/api/reports'),
         fetch('/api/documents'),
         fetch('/api/transactions?limit=200'),
@@ -81,8 +82,9 @@ export default function CAFlowDashboard() {
         fetch('/api/clients'),
         fetch('/api/insights'),
         fetch('/api/reviews?limit=50'),
+        fetch('/api/visits'),
       ]);
-      const [statsData, docsData, txData, reconsData, clientsData, insightsData, reviewsData] = await Promise.all([
+      const [statsData, docsData, txData, reconsData, clientsData, insightsData, reviewsData, visitsData] = await Promise.all([
         statsRes.json(),
         docsRes.json(),
         txRes.json(),
@@ -90,6 +92,7 @@ export default function CAFlowDashboard() {
         clientsRes.json(),
         insightsRes.json(),
         reviewsRes.json(),
+        visitsRes.json(),
       ]);
       setStats(statsData.stats);
       setDocuments(docsData.documents || []);
@@ -98,12 +101,22 @@ export default function CAFlowDashboard() {
       setClients(clientsData.clients || []);
       setInsights(insightsData.error ? null : insightsData);
       setReviews(reviewsData.error ? null : reviewsData);
+      setVisits(visitsData.error ? null : visitsData);
     } catch (e) {
       console.error(e);
       notify('Failed to load data');
     }
     setLoading(false);
   }
+
+  // auto-log visit once per mount (huge quantity: every pageview counted, deduped server-side 5min)
+  useEffect(() => {
+    fetch('/api/visits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: typeof window !== 'undefined' ? window.location.pathname : '/dashboard' }),
+    }).catch(() => {});
+  }, []);
 
   async function submitReview(rating: number, text: string, source = 'in_app') {
     const res = await fetch('/api/reviews', {
@@ -262,7 +275,14 @@ export default function CAFlowDashboard() {
             </div>
 
             <div className="flex items-center gap-2 ml-auto">
-              {/* 5-sec micro-review: header stars */}
+              {/* visits live */}
+              <div className="hidden md:flex items-center gap-2 pl-3 pr-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-sm text-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-medium">{visits?.total ?? 0} visits</span>
+                <span className="text-slate-400">• {visits?.unique ?? 0} unique</span>
+                <span className="text-slate-400">• today {visits?.today ?? 0}</span>
+              </div>
+              {/* Genuine micro-review: header stars — no pulse, honest */}
               <div className="hidden lg:flex items-center gap-1 pl-2 pr-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-sm">
                 <button
                   onClick={() => setView('reviews')}
@@ -273,13 +293,15 @@ export default function CAFlowDashboard() {
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
                     key={n}
-                    onClick={async () => {
-                      if (headerRating === n) return;
+                    onClick={() => {
                       setHeaderRating(n);
-                      await submitReview(n, '', 'header_stars');
+                      openReviewModalWithDraft();
+                      // pre-set rating in modal
+                      setTimeout(() => setShowReviewModal((s) => ({ ...s, rating: n })), 50);
                     }}
                     className="leading-none"
                     aria-label={`Rate ${n} stars`}
+                    title="Write genuine review — 20 chars required"
                   >
                     <span className={n <= (headerRating || 0) ? 'text-amber-400' : 'text-slate-300 hover:text-amber-300'}>★</span>
                   </button>
@@ -345,7 +367,7 @@ export default function CAFlowDashboard() {
               )}
               {view === 'clients' && <ClientsView clients={clients} onRefresh={loadAll} showModal={showClientModal} setShowModal={setShowClientModal} />}
               {view === 'insights' && <InsightsView insights={insights} />}
-              {view === 'reviews' && <ReviewsView reviews={reviews} onSubmit={submitReview} onRefresh={loadAll} />}
+              {view === 'reviews' && <ReviewsView reviews={reviews} visits={visits} onSubmit={submitReview} onRefresh={loadAll} />}
             </>
           )}
         </main>
@@ -364,56 +386,66 @@ export default function CAFlowDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowReviewModal({ ...showReviewModal, open: false })} />
           <div className="relative bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-fadeIn">
-            <div className="mesh-hero p-6 text-white relative">
-              <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
-              <div className="relative">
-                <p className="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full bg-white/15 border border-white/20">★ Huge thanks — 5 sec review</p>
-                <h4 className="text-xl font-semibold mt-3">Love CA-Flow?</h4>
-                <p className="text-sm text-indigo-100 mt-1">1 tap = counted. Add a line if you can — helps other CAs.</p>
+            <div className="bg-white p-6 border-b border-slate-100 relative">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 text-sm">✓</span>
+                <p className="text-xs font-semibold tracking-wide text-emerald-700 uppercase">Genuine reviews only</p>
               </div>
-              <button onClick={() => setShowReviewModal({ ...showReviewModal, open: false })} className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 hover:bg-white/20">
+              <h4 className="text-xl font-semibold mt-3 tracking-tight">Share your honest experience</h4>
+              <p className="text-sm text-slate-500 mt-1">Verified usage only. We show both good and critical feedback — it helps everyone.</p>
+              <button onClick={() => setShowReviewModal({ ...showReviewModal, open: false })} className="absolute top-4 right-4 p-2 rounded-xl hover:bg-slate-100">
                 <X size={16} />
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="flex items-center justify-center gap-1">
+              <div className="flex items-center justify-center gap-2">
                 {[1, 2, 3, 4, 5].map((n) => (
-                  <button key={n} onClick={() => setShowReviewModal({ ...showReviewModal, rating: n })} className="text-3xl transition-transform hover:scale-110">
-                    <span className={n <= showReviewModal.rating ? 'text-amber-400' : 'text-slate-200'}>★</span>
+                  <button
+                    key={`${n}-${showReviewModal.rating >= n}`}
+                    onClick={() => setShowReviewModal({ ...showReviewModal, rating: n })}
+                    className="text-4xl transition-transform hover:scale-110 active:scale-95"
+                  >
+                    <span className={n <= showReviewModal.rating ? 'text-amber-400 inline-block' : 'text-slate-200 hover:text-amber-200 inline-block'}>★</span>
                   </button>
                 ))}
               </div>
-              <p className="text-center text-xs text-slate-500">{showReviewModal.rating === 5 ? 'Amazing — thank you!' : showReviewModal.rating >= 4 ? 'Great!' : showReviewModal.rating >= 3 ? 'Thanks!' : 'Thanks for feedback'}</p>
+              <p className="text-center text-xs text-slate-500">{showReviewModal.rating === 5 ? 'Excellent — thank you' : showReviewModal.rating >= 4 ? 'Great — thanks' : showReviewModal.rating >= 3 ? 'Appreciate your honesty' : 'Thanks for the honest feedback'}</p>
               <textarea
                 value={showReviewModal.text}
                 onChange={(e) => setShowReviewModal({ ...showReviewModal, text: e.target.value })}
-                rows={3}
-                placeholder="AI draft — edit or keep (optional, but doubles visibility)…"
+                rows={4}
+                placeholder="What did you actually use? e.g. Uploaded HDFC + Tally, matched 28 tx, Smart Insights flagged… (min 20 chars for genuine)"
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-200"
               />
+              <p className="text-[11px] text-slate-400">{showReviewModal.text.trim().length}/20 chars — genuine reviews require detail</p>
               <div className="flex gap-3">
                 <button onClick={() => setShowReviewModal({ ...showReviewModal, open: false })} className="flex-1 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-medium">
-                  Later
+                  Cancel
                 </button>
                 <button
                   onClick={async () => {
+                    if (showReviewModal.text.trim().length < 20) {
+                      alert('Genuine review needs at least 20 characters — tell us what you actually did.');
+                      return;
+                    }
                     const ok = await submitReview(showReviewModal.rating, showReviewModal.text, 'modal');
                     if (ok) setShowReviewModal({ ...showReviewModal, open: false });
                   }}
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium shadow-md"
+                  className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold shadow-md disabled:opacity-50"
+                  disabled={showReviewModal.text.trim().length < 20}
                 >
-                  Post {showReviewModal.rating}★ review
+                  Post {showReviewModal.rating}★ — genuine
                 </button>
               </div>
-              <p className="text-[11px] text-center text-slate-400">Takes 5 sec • Honest reviews only • 1 extra client slot for any rating</p>
+              <p className="text-[11px] text-center text-slate-400">Verified • We publish 1-5★ as-is • No incentive for rating value</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Floating review FAB — always present for huge quantity */}
-      <button onClick={() => openReviewModalWithDraft()} className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl hover:shadow-2xl flex items-center justify-center hover:scale-105 transition-transform">
-        <Sparkles size={20} />
+      {/* Floating review FAB — genuine, subtle */}
+      <button onClick={() => openReviewModalWithDraft()} className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-white border border-slate-200 text-slate-700 shadow-lg hover:shadow-xl flex items-center justify-center hover:scale-105 transition-transform">
+        <Sparkles size={18} className="text-indigo-600" />
       </button>
     </div>
   );
@@ -1468,18 +1500,63 @@ function InsightsView({ insights }: { insights: any }) {
   );
 }
 
-function ReviewsView({ reviews, onSubmit, onRefresh }: any) {
+function ConfettiBurst({ pieces = 36 }: { pieces?: number }) {
+  const items = useMemo(
+    () =>
+      Array.from({ length: pieces }, (_, i) => ({
+        left: `${(i * 97) % 100}%`,
+        delay: `${((i * 37) % 600) / 1000}s`,
+        size: 6 + ((i * 13) % 8),
+        color: ['#f59e0b', '#4f46e5', '#10b981', '#ef4444', '#7c3aed', '#fbbf24'][(i * 7) % 6],
+        round: i % 3 === 0,
+      })),
+    [pieces]
+  );
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-10">
+      {items.map((p, i) => (
+        <span
+          key={i}
+          className="confetti-piece"
+          style={{
+            left: p.left,
+            animationDelay: p.delay,
+            width: p.size,
+            height: p.round ? p.size : p.size * 0.5,
+            background: p.color,
+            borderRadius: p.round ? '999px' : '2px',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ReviewsView({ reviews, visits, onSubmit, onRefresh }: any) {
   const [rating, setRating] = useState(5);
   const [text, setText] = useState('');
   const [author, setAuthor] = useState('CA User');
+  const [celebrate, setCelebrate] = useState(false);
   const count = reviews?.stats?.count || 0;
   const avg = reviews?.stats?.avg || 0;
   const dist = reviews?.stats?.dist || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   const maxDist = Math.max(1, ...Object.values(dist).map(Number));
+  const FOUNDING_CAP = 50;
+  const foundingLeft = Math.max(0, FOUNDING_CAP - count);
+  const foundingPct = Math.min(100, (count / FOUNDING_CAP) * 100);
+  const tier = rating === 5 && text.trim().length >= 3 ? 'Gold Founder' : rating >= 4 ? 'Silver Founder' : 'Bronze Founder';
 
   async function handleSubmit() {
-    const ok = await onSubmit(rating, text || `Rated ${rating}★ — great experience`);
-    if (ok) setText('');
+    if (text.trim().length < 20) {
+      alert('Genuine review needs at least 20 characters — tell us what you actually did.');
+      return;
+    }
+    const ok = await onSubmit(rating, text, 'reviews_tab');
+    if (ok) {
+      setText('');
+      setCelebrate(true);
+      setTimeout(() => setCelebrate(false), 2000);
+    }
   }
 
   const waShare = `https://wa.me/?text=${encodeURIComponent(`Check CA-Flow — ${avg.toFixed(1)}★ from ${count} CAs — ` + (typeof window !== 'undefined' ? window.location.href : ''))}`;
@@ -1492,9 +1569,13 @@ function ReviewsView({ reviews, onSubmit, onRefresh }: any) {
         <div className="absolute -right-10 -top-10 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
         <div className="relative flex flex-wrap gap-6">
           <div className="flex-1 min-w-[240px]">
-            <p className="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full bg-white/15 border border-white/20">★ Social proof = huge quantity</p>
+            <p className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/15 border border-white/20 font-medium">✓ Genuine reviews — verified only</p>
             <h3 className="text-2xl font-semibold mt-3">Reviews — Wall of Trust</h3>
-            <p className="text-indigo-100 text-sm mt-1 max-w-xl">Every ★ counts. We ask at the moment you win (post-recon). 1-tap stars + AI draft = 30-50% conversion vs 1-3% for old forms.</p>
+            <p className="text-indigo-100 text-sm mt-1 max-w-xl">Honest, verified feedback from CAs who actually used CA-Flow. We publish 1-5★ as-is — no incentive for rating value.</p>
+            <div className="mt-3 inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/15 border border-white/20">
+              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+              {visits ? `${visits.total} visits • ${visits.unique} unique • ${visits.today} today` : 'loading visits…'} • <a href={typeof window !== 'undefined' ? window.location.href : '#'} target="_blank" className="underline">public link</a>
+            </div>
             <div className="mt-4 flex gap-2">
               <a href={waShare} target="_blank" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-slate-900 text-sm font-medium">
                 <MessageCircle size={16} /> Share on WhatsApp
@@ -1509,7 +1590,7 @@ function ReviewsView({ reviews, onSubmit, onRefresh }: any) {
               <div className="text-4xl font-bold tracking-tight">{avg ? avg.toFixed(1) : '—'}</div>
               <div>
                 <div className="flex text-amber-400 text-sm">{[1, 2, 3, 4, 5].map((n) => <span key={n} className={n <= Math.round(avg) ? '' : 'text-slate-200'}>★</span>)}</div>
-                <p className="text-xs text-slate-500">{count} reviews • Huge quantity engine</p>
+                <p className="text-xs text-slate-500">{count} genuine reviews • avg {avg ? avg.toFixed(1) : '—'}★</p>
               </div>
             </div>
             <div className="mt-4 space-y-1.5">
@@ -1527,44 +1608,62 @@ function ReviewsView({ reviews, onSubmit, onRefresh }: any) {
         </div>
       </div>
 
-      {/* Quick capture — huge quantity: 5-sec */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 lg:p-6 shadow-sm card-hover gradient-border">
-        <h4 className="font-semibold flex items-center gap-2">
-          <span className="w-7 h-7 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-600">★</span> 5-sec review — huge quantity
-        </h4>
-        <p className="text-xs text-slate-500 mt-1">Tap stars → Post. Optional line = more trust. Incentive: any rating gets +1 free client slot.</p>
-        <div className="mt-4 flex items-center gap-1">
+      {/* Genuine capture — verified, no desperate nudging */}
+      <div className="relative bg-white rounded-2xl border border-slate-200 p-5 lg:p-6 shadow-sm card-hover overflow-hidden">
+        <div className="flex items-center gap-2">
+          <span className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">✓</span>
+          <h4 className="font-semibold">Share genuine experience</h4>
+          {celebrate && <span className="ml-auto text-xs px-3 py-1.5 rounded-full bg-emerald-500 text-white font-semibold badge-unlock">Thank you — genuine</span>}
+        </div>
+        <p className="text-xs text-slate-500 mt-1">Verified only — tell us what you actually did (min 20 chars). We publish all ratings honestly.</p>
+        <div className="mt-4 flex items-center justify-center gap-2">
           {[1, 2, 3, 4, 5].map((n) => (
-            <button key={n} onClick={() => setRating(n)} className="text-3xl hover:scale-110 transition-transform">
-              <span className={n <= rating ? 'text-amber-400' : 'text-slate-200'}>★</span>
+            <button key={`${n}-${rating >= n}`} onClick={() => setRating(n)} className="text-4xl hover:scale-110 active:scale-95 transition-transform">
+              <span className={n <= rating ? 'text-amber-400 inline-block' : 'text-slate-200 hover:text-amber-200 inline-block'}>★</span>
             </button>
           ))}
-          <span className="ml-2 text-sm font-medium">{rating}★</span>
         </div>
-        <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Your name (CA User)" className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="AI draft: CA-Flow saved 4 hrs… — edit or keep (optional)" className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        <p className="text-center text-xs text-slate-500 mt-2">{rating === 5 ? 'Excellent — share detail' : rating >= 4 ? 'Great — thanks' : rating >= 3 ? 'Appreciate honesty' : 'Thanks for feedback'}</p>
+        <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Your name (CA User)" className="mt-4 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="What did you actually use? Uploaded HDFC + Tally, matched… (min 20 chars for genuine)" className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        <p className="text-[11px] text-slate-400">{text.trim().length}/20 chars — genuine needs detail</p>
         <button
-          onClick={async () => {
-            const res = await fetch('/api/reviews', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rating, text, author_name: author, source: 'reviews_tab' }) });
-            if (res.ok) {
-              setText('');
-              onRefresh();
-            }
-          }}
-          className="mt-3 w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm shadow-md"
+          onClick={handleSubmit}
+          disabled={text.trim().length < 20}
+          className="mt-3 w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm shadow-md disabled:opacity-50"
         >
-          Post {rating}★ — instant
+          Post {rating}★ — genuine
         </button>
-        <p className="text-[11px] text-center text-slate-400 mt-2">QR for office • WhatsApp • Google link above — all point here</p>
+        <p className="text-[11px] text-center text-slate-400 mt-2">Verified • We publish 1-5★ as-is • No incentive for rating value</p>
       </div>
+
+      {/* Live ticker — social proof craving */}
+      {count > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="px-4 py-2 border-b border-slate-100 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <p className="text-xs font-semibold text-slate-600">LIVE — CAs are rating right now</p>
+          </div>
+          <div className="overflow-hidden py-2">
+            <div className="ticker-track flex gap-3 whitespace-nowrap w-max px-2">
+              {[...(reviews?.reviews || []).slice(0, 8), ...(reviews?.reviews || []).slice(0, 8)].map((r: any, i: number) => (
+                <span key={`${r.id}-${i}`} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800">
+                  <span className="text-amber-500">★{r.rating}</span> {r.author_name} just reviewed
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Wall */}
       <div>
         <h4 className="font-semibold flex items-center gap-2">Wall ({count})</h4>
         {count === 0 ? (
           <div className="mt-3 rounded-2xl border-2 border-dashed border-slate-200 bg-white p-10 text-center">
-            <p className="font-medium">Be the first to review</p>
-            <p className="text-sm text-slate-500">Your words help 100s of CAs trust CA-Flow</p>
+            <p className="inline-flex text-xs px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium">✓ Genuine only</p>
+            <p className="font-semibold mt-3">Be the first — share honest feedback</p>
+            <p className="text-sm text-slate-500">Verified users only — helps other CAs decide</p>
           </div>
         ) : (
           <div className="mt-3 grid md:grid-cols-2 gap-3">

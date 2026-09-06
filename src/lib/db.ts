@@ -142,5 +142,17 @@ function initDb(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (tenant_id) REFERENCES tenants(id)
     );
+
+    CREATE TABLE IF NOT EXISTS visits (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      ip TEXT,
+      user_agent TEXT,
+      path TEXT,
+      country TEXT,
+      city TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+    );
   `);
 }
