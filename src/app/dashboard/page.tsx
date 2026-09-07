@@ -41,10 +41,11 @@ import {
 } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
-type View = 'dashboard' | 'documents' | 'transactions' | 'reconciliations' | 'clients' | 'insights' | 'reviews' | 'plugins' | 'history';
+type View = 'dashboard' | 'documents' | 'transactions' | 'reconciliations' | 'clients' | 'insights' | 'reviews' | 'plugins' | 'history' | 'analytics';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview' },
+  { id: 'analytics', label: 'Analytics', icon: TrendingUp, desc: 'Usage & visits' },
   { id: 'documents', label: 'Documents', icon: FileText, desc: 'Uploads' },
   { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight, desc: 'Ledger entries' },
   { id: 'reconciliations', label: 'Reconciliations', icon: BarChart3, desc: 'Match & review' },
@@ -74,6 +75,17 @@ function getAnonHeaders(): Record<string, string> {
   const user = localStorage.getItem('ca_logged_in');
   if (user === 'true') return {};
   return { 'x-anonymous-tenant': getAnonTenant() };
+}
+
+function trackEvent(event_type: string, event_name: string, metadata?: any) {
+  try {
+    const h = getAnonHeaders() as Record<string, string>;
+    fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...h },
+      body: JSON.stringify({ event_type, event_name, metadata, path: typeof window !== 'undefined' ? window.location.pathname : '' }),
+    }).catch(() => {});
+  } catch {}
 }
 
 function UserMenu() {
@@ -518,6 +530,201 @@ function ChatbotView({ messages, input, setInput, onSend, loading, chatEndRef }:
   );
 }
 
+// ==================== ANALYTICS VIEW ====================
+function AnalyticsView() {
+  const [data, setData] = useState<any>(null);
+  const [range, setRange] = useState<'7d' | '30d'>('7d');
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const h = getAnonHeaders() as Record<string, string>;
+      const res = await fetch(`/api/analytics?range=${range}`, { headers: h });
+      const d = await res.json();
+      if (!d.error) setData(d);
+    } catch {}
+    setLoading(false);
+  }, [range]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const id = setInterval(load, 30000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  if (loading && !data) {
+    return (
+      <div className="flex items-center justify-center h-[40vh]">
+        <div className="text-center"><div className="w-8 h-8 border-2 border-slate-200 border-t-indigo-600 rounded-full animate-spin mx-auto" /><p className="text-sm text-slate-500 mt-3">Loading analytics…</p></div>
+      </div>
+    );
+  }
+  if (!data) return <p className="text-sm text-slate-500">No analytics yet.</p>;
+
+  const v = data.visits || {};
+  const e = data.events || {};
+  const u = data.usage || {};
+  const lastDays = (v.lastDays || []).map((r: any) => ({ date: String(r.d).slice(5), visits: r.c, unique: r.unique_c }));
+  const hourly = (v.hourly || []).map((r: any) => ({ hour: `${r.h}:00`, visits: r.c }));
+  const topViews = e.topViews || [];
+  const topPlugins = e.topPlugins || [];
+  const topTools = e.topTools || [];
+  const COLORS = ['#4f46e5', '#7c3aed', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <div>
+          <h3 className="text-xl font-semibold tracking-tight flex items-center gap-2"><TrendingUp size={18} className="text-indigo-600" /> Analytics — Who’s using LedgerFlow?</h3>
+          <p className="text-sm text-slate-500">Live visits, tab popularity, plugin usage — all tenant-isolated, updated every 30s.</p>
+        </div>
+        <div className="ml-auto flex gap-1.5 bg-slate-100 rounded-xl p-1">
+          {(['7d', '30d'] as const).map((r) => (
+            <button key={r} onClick={() => setRange(r)} className={cls('px-3 py-1.5 rounded-lg text-xs font-medium', range === r ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500')}>{r === '7d' ? 'Last 7 days' : 'Last 30 days'}</button>
+          ))}
+          <button onClick={load} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-200">↻</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Visits', value: v.total ?? 0, sub: `${v.unique ?? 0} unique • all tenants`, icon: Activity },
+          { label: 'Today', value: v.today ?? 0, sub: `${v.todayUnique ?? 0} unique today`, icon: Wallet },
+          { label: 'Active Now', value: v.activeNow ?? 0, sub: `${v.activeToday ?? 0} last 24h • 15m window`, icon: Zap },
+          { label: 'Your Firm', value: v.tenantVisits ?? 0, sub: `${u.tenantClients ?? 0} clients • ${u.tenantDocs ?? 0} docs`, icon: Building2 },
+        ].map((k) => (
+          <div key={k.label} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-slate-500 text-xs"><k.icon size={14} /> {k.label}</div>
+            <p className="text-2xl font-bold mt-1">{k.value}</p>
+            <p className="text-xs text-slate-500">{k.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <h4 className="font-semibold text-sm">Visits — {range === '7d' ? 'Last 7 days' : 'Last 30 days'}</h4>
+          <p className="text-xs text-slate-500">Visits vs unique visitors</p>
+          <div className="h-[180px] mt-3">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={lastDays}>
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip />
+                <Area type="monotone" dataKey="visits" stroke="#4f46e5" fill="#e0e7ff" strokeWidth={2} />
+                <Area type="monotone" dataKey="unique" stroke="#10b981" fill="#d1fae5" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <h4 className="font-semibold text-sm">Today — Hourly</h4>
+          <p className="text-xs text-slate-500">When are people most active?</p>
+          <div className="h-[180px] mt-3">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={hourly.length ? hourly : [{ hour: '—', visits: 0 }]}>
+                <XAxis dataKey="hour" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip />
+                <Bar dataKey="visits" fill="#7c3aed" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <h4 className="font-semibold text-sm">Most Used Tabs</h4>
+          <p className="text-xs text-slate-500">Which views do people open?</p>
+          {topViews.length === 0 ? <p className="text-xs text-slate-400 mt-3">No tab events yet — navigate a bit.</p> : (
+            <div className="mt-3 space-y-2">
+              {topViews.slice(0, 6).map((r: any, i: number) => (
+                <div key={r.name} className="flex items-center gap-2">
+                  <span className="text-xs font-medium w-28 truncate">{r.name}</span>
+                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-2 bg-indigo-600" style={{ width: `${(r.count / (topViews[0]?.count || 1)) * 100}%` }} /></div>
+                  <span className="text-xs text-slate-600">{r.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <h4 className="font-semibold text-sm">Most Used Plugins</h4>
+          <p className="text-xs text-slate-500">Which plugins are called in chat?</p>
+          {topPlugins.length === 0 ? <p className="text-xs text-slate-400 mt-3">No plugin calls yet — try “verify gst …” in chat.</p> : (
+            <div className="h-[160px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={topPlugins} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={60} label={({ name, value }: any) => `${name} ${value}`}>
+                    {topPlugins.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <h4 className="font-semibold text-sm">Top Tools / Actions</h4>
+          <p className="text-xs text-slate-500">Exports, verifications, sends</p>
+          {topTools.length === 0 ? <p className="text-xs text-slate-400 mt-3">No tool usage yet.</p> : (
+            <div className="mt-3 space-y-2">
+              {topTools.slice(0, 6).map((r: any) => (
+                <div key={r.name} className="flex items-center gap-2">
+                  <span className="text-xs font-medium w-32 truncate">{r.name}</span>
+                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-2 bg-emerald-500" style={{ width: `${(r.count / (topTools[0]?.count || 1)) * 100}%` }} /></div>
+                  <span className="text-xs text-slate-600">{r.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 font-semibold text-sm">Recent Visits (global)</div>
+          <div className="divide-y divide-slate-100 max-h-[260px] overflow-auto">
+            {(v.recentVisits || []).slice(0, 10).map((r: any) => (
+              <div key={r.id} className="px-4 py-2 flex items-center gap-3 text-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-mono truncate">{r.ip}</span>
+                <span className="truncate flex-1">{r.path}</span>
+                <span className="text-slate-400 whitespace-nowrap">{new Date(r.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+            ))}
+            {(v.recentVisits || []).length === 0 && <p className="px-4 py-6 text-xs text-slate-400 text-center">No visits yet.</p>}
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 font-semibold text-sm">Recent Plugin / Tab Events (your firm)</div>
+          <div className="divide-y divide-slate-100 max-h-[260px] overflow-auto">
+            {(e.recentEvents || []).slice(0, 10).map((r: any) => (
+              <div key={r.id} className="px-4 py-2 flex items-center gap-2 text-xs">
+                <span className={cls('px-1.5 py-0.5 rounded-full border text-[10px] font-medium', r.event_type === 'view' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-violet-50 border-violet-200 text-violet-700')}>{r.event_type}</span>
+                <span className="font-medium truncate">{r.event_name}</span>
+                <span className="text-slate-400 truncate flex-1">{r.path}</span>
+                <span className="text-slate-400 whitespace-nowrap">{new Date(r.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+            ))}
+            {(e.recentEvents || []).length === 0 && <p className="px-4 py-6 text-xs text-slate-400 text-center">No events yet — switch tabs or call a plugin in chat.</p>}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <h4 className="font-semibold text-sm">Top Paths (where people land)</h4>
+        <div className="mt-3 grid sm:grid-cols-2 gap-2 text-xs">
+          {(v.topPaths || []).map((r: any) => (
+            <div key={r.path} className="flex justify-between bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
+              <span className="truncate font-mono">{r.path}</span><span className="font-medium">{r.c}</span>
+            </div>
+          ))}
+          {(v.topPaths || []).length === 0 && <p className="text-slate-400">No path data.</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ==================== HISTORY VIEW — now backed by persistent activity log ====================
 function HistoryView({ transactions, reconciliations, clients }: { transactions: any[]; reconciliations: any[]; clients: any[] }) {
   const [activities, setActivities] = useState<any[] | null>(null);
@@ -716,6 +923,10 @@ export default function CAFlowDashboard() {
   const [showChatWidget, setShowChatWidget] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    trackEvent('view', view);
+  }, [view]);
+
   function notify(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
@@ -845,6 +1056,7 @@ export default function CAFlowDashboard() {
       return;
     }
     const totalTx = data.documents?.reduce((s: number, d: any) => s + (d.transactionCount || 0), 0) || 0;
+    trackEvent('tool', 'document_upload', { files: data.documents?.length || 0, transactions: totalTx, clientId });
     notify(`Uploaded ${data.documents?.length || 0} file(s) — ${totalTx} transactions extracted`);
     loadAll();
   }
@@ -857,6 +1069,7 @@ export default function CAFlowDashboard() {
       notify(data.error || 'Reconciliation failed');
       return;
     }
+    trackEvent('tool', 'reconciliation_run', { matched: data.matchedCount, exceptions: data.exceptionCount, stats: data.stats });
     notify(`Matched ${data.matchedCount} • ${data.exceptionCount} exceptions`);
     loadAll();
     // Huge-quantity trigger: ask at peak delight — post-success modal
@@ -1045,6 +1258,9 @@ export default function CAFlowDashboard() {
     } catch (err) {
       response = 'Something went wrong. Please try again.';
     }
+
+    if (plugin) trackEvent('plugin', plugin, { toolMeta, query: msg.slice(0, 120) });
+    else if (response && !response.startsWith('Switched')) trackEvent('tool', 'chat_other', { query: msg.slice(0, 80) });
 
     setChatMessages((prev) => [...prev, { role: 'bot', text: response, plugin, toolMeta }]);
     setChatLoading(false);
@@ -1236,6 +1452,7 @@ export default function CAFlowDashboard() {
               )}
               {view === 'clients' && <ClientsView clients={clients} onRefresh={loadAll} showModal={showClientModal} setShowModal={setShowClientModal} />}
               {view === 'insights' && <InsightsView insights={insights} />}
+              {view === 'analytics' && <AnalyticsView />}
               {view === 'reviews' && <ReviewsView reviews={reviews} visits={visits} onSubmit={submitReview} onRefresh={loadAll} />}
               {view === 'plugins' && <PluginsView onNavigate={setView} />}
               {view === 'history' && <HistoryView transactions={transactions} reconciliations={reconciliations} clients={clients} />}

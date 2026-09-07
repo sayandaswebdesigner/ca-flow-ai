@@ -231,6 +231,19 @@ CREATE TABLE IF NOT EXISTS activities (
   user_agent TEXT,
   created_at TEXT DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  user_id TEXT REFERENCES users(id),
+  event_type TEXT NOT NULL,
+  event_name TEXT NOT NULL,
+  metadata TEXT,
+  path TEXT,
+  ip TEXT,
+  user_agent TEXT,
+  created_at TEXT DEFAULT NOW()
+);
 `;
 
 // ---------- SQLite (local dev) ----------
@@ -387,6 +400,19 @@ CREATE TABLE IF NOT EXISTS activities (
   entity_id TEXT,
   entity_name TEXT,
   details TEXT,
+  ip TEXT,
+  user_agent TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+);
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  user_id TEXT,
+  event_type TEXT NOT NULL,
+  event_name TEXT NOT NULL,
+  metadata TEXT,
+  path TEXT,
   ip TEXT,
   user_agent TEXT,
   created_at TEXT DEFAULT (datetime('now')),

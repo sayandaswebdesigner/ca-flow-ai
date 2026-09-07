@@ -68,6 +68,19 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get('clientId');
     const format = (searchParams.get('format') || 'excel').toLowerCase(); // excel | tally
     const reconId = searchParams.get('reconciliationId');
+    // Track export as analytics event (best-effort)
+    try {
+      const { v4: _uuid } = await import('uuid');
+      const token = request.cookies.get('ca_session')?.value || null;
+      const { getSessionUser } = await import('@/lib/auth');
+      const user = await getSessionUser(token as any);
+      const t = await db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId) as any;
+      if (!t) await db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, 'My Firm', 'professional');
+      await db.prepare(`INSERT INTO analytics_events (id, tenant_id, user_id, event_type, event_name, metadata, path, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        _uuid(), tenantId, user?.id || null, 'tool', `export_${format}`, JSON.stringify({ reconId, clientId }).slice(0, 500),
+        request.nextUrl.pathname, request.headers.get('x-forwarded-for')?.split(',')[0] || null, (request.headers.get('user-agent') || '').slice(0, 300)
+      );
+    } catch {}
 
     let transactions: any[];
     let clientName = 'All Clients';
