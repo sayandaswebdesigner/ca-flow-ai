@@ -13,14 +13,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://ca-flow-ai.vercel.app'),
+  metadataBase: new URL('https://getledgerflow.vercel.app'),
   title: "LedgerFlow - Reconciliation Platform",
   description: "Reconciliation OS for Finance Teams, CAs & Accountants. Upload bank + Tally, auto-match in seconds, flag anomalies, export GST-ready — free.",
   keywords: ["reconciliation","ledger","Tally","GST","bank reconciliation","finance","accounting","India","CA","audit"],
   openGraph: {
     title: "LedgerFlow — Reconciliation OS for Finance Teams",
     description: "Auto-match bank + ledger, flag anomalies, export GST-ready. Free for CAs.",
-    url: "https://ca-flow-ai.vercel.app",
+    url: "https://getledgerflow.vercel.app",
     siteName: "LedgerFlow",
     type: "website",
   },
