@@ -21,6 +21,7 @@ export async function POST(
       exceptionCount: result.exceptions.length,
       matched: result.matched,
       exceptions: result.exceptions,
+      stats: result.stats,
     });
   } catch (error: any) {
     console.error('Reconciliation error:', error);

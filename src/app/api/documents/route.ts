@@ -5,7 +5,7 @@ import { v4 as uuid } from 'uuid';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { parseCSV, parseExcel, classifyDocument, parseInvoiceText } from '@/lib/parser';
+import { parseCSV, parseExcel, classifyDocument, parseInvoiceText, extractUTR, getBankLabel } from '@/lib/parser';
 
 async function ensureTenant(db: any, tenantId: string) {
   const t = await db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId);
@@ -23,7 +23,6 @@ function parseTransactionsFromPdfText(text: string): { date: string; description
     const amtRaw = m[2].replace(/,/g, '');
     const amt = parseFloat(amtRaw);
     if (isNaN(amt) || Math.abs(amt) < 1) continue;
-    // Date normalize DD/MM/YYYY
     const dmy = dateRaw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
     let date = dateRaw;
     if (dmy) {
@@ -31,13 +30,12 @@ function parseTransactionsFromPdfText(text: string): { date: string; description
       const yy = y.length === 2 ? '20' + y : y;
       date = `${yy}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
     }
-    const desc = line.replace(m[0], '').replace(/\s{2,}/g, ' ').trim().slice(0, 120) || 'Transaction';
-    // Skip header-like lines
+    const desc = line.replace(m[0], '').replace(/\s{2,}/g, ' ').trim().slice(0, 200) || 'Transaction';
     if (/balance|opening|closing|statement/i.test(desc) && Math.abs(amt) < 1000) continue;
-    // Heuristic: if line has DEBIT/CREDIT keywords, sign accordingly; else positive = credit
     const isDebit = /debit|withdrawal|dr\b|payment to/i.test(line);
     const amount = amt > 0 && isDebit && amt < 1000000 ? -Math.abs(amt) : amt;
-    out.push({ date, description: desc, amount, reference: undefined });
+    const utr = extractUTR(line);
+    out.push({ date, description: desc, amount, reference: utr });
   }
   return out;
 }
@@ -79,9 +77,9 @@ export async function POST(request: NextRequest) {
       try {
         if (ext === 'csv') {
           textContent = buffer.toString('utf-8');
-          transactions = parseCSV(textContent);
+          transactions = parseCSV(textContent, file.name);
         } else if (ext === 'xlsx' || ext === 'xls') {
-          transactions = parseExcel(buffer);
+          transactions = parseExcel(buffer, file.name);
           textContent = JSON.stringify(transactions).slice(0, 2000);
         } else if (ext === 'pdf') {
           try {
@@ -99,7 +97,7 @@ export async function POST(request: NextRequest) {
           }
         } else if (ext === 'txt') {
           textContent = buffer.toString('utf-8');
-          transactions = parseCSV(textContent);
+          transactions = parseCSV(textContent, file.name);
           if (!transactions.length) extractedData = parseInvoiceText(textContent);
         } else {
           textContent = buffer.toString('utf-8').slice(0, 4000);
@@ -109,19 +107,22 @@ export async function POST(request: NextRequest) {
       }
 
       const classification = classifyDocument(file.name, textContent);
+      const detectedBank = (classification as any).detectedBank || transactions[0]?.detectedBank || 'other';
+      const bankLabel = getBankLabel(detectedBank);
+      const utrExtracted = transactions.filter((t: any) => t.reference && String(t.reference).length >= 10).length;
 
       // Override classification if we actually parsed bank-like tx
       let docType = classification.type;
       let sourceType: 'bank' | 'ledger' = 'ledger';
       if (transactions.length >= 3) {
-        // Heuristic: bank statements have many tx, ledger also — keep classifier but map source
         sourceType = docType === 'bank_statement' ? 'bank' : 'ledger';
         if (docType === 'other' && transactions.length > 0) docType = 'bank_statement';
       }
 
+      const meta = JSON.stringify({ detectedBank, bankLabel, utrExtracted, totalTx: transactions.length });
       await db.prepare(
-        `INSERT INTO documents (id, tenant_id, client_id, file_name, mime_type, storage_path, file_size, status, document_type, classification_confidence, extracted_data, processed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+        `INSERT INTO documents (id, tenant_id, client_id, file_name, mime_type, storage_path, file_size, status, document_type, classification_confidence, extracted_data, metadata, processed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
       ).run(
         docId,
         tenantId,
@@ -133,7 +134,8 @@ export async function POST(request: NextRequest) {
         transactions.length > 0 || extractedData ? 'extracted' : 'uploaded',
         docType,
         classification.confidence,
-        extractedData ? JSON.stringify(extractedData) : null
+        extractedData ? JSON.stringify(extractedData) : null,
+        meta
       );
 
       const insertTx = db.prepare(
@@ -155,6 +157,9 @@ export async function POST(request: NextRequest) {
         confidence: classification.confidence,
         transactionCount: transactions.length,
         status: transactions.length > 0 || extractedData ? 'extracted' : 'uploaded',
+        detectedBank,
+        bankLabel,
+        utrExtracted,
       });
     }
 
