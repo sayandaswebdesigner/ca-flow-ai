@@ -161,8 +161,6 @@ type PluginDef = {
   category: 'Tax & Compliance' | 'Communication' | 'Import/Export' | 'AI';
   author: string;
   version: string;
-  installs: string;
-  rating: string;
   tools: string[]; // tool names the assistant can invoke
 };
 
@@ -178,8 +176,6 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     category: 'Tax & Compliance',
     author: 'CA-Flow',
     version: '1.2',
-    installs: '12.4k',
-    rating: '4.9',
     tools: ['verify_gst'],
   },
   {
@@ -193,8 +189,6 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     category: 'Tax & Compliance',
     author: 'CA-Flow',
     version: '1.2',
-    installs: '9.8k',
-    rating: '4.9',
     tools: ['verify_pan'],
   },
   {
@@ -208,8 +202,6 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     category: 'Communication',
     author: 'CA-Flow',
     version: '1.4',
-    installs: '18.2k',
-    rating: '4.8',
     tools: ['send_whatsapp', 'whatsapp_intake'],
   },
   {
@@ -223,8 +215,6 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     category: 'Communication',
     author: 'CA-Flow',
     version: '1.1',
-    installs: '7.3k',
-    rating: '4.7',
     tools: ['send_email'],
   },
   {
@@ -238,8 +228,6 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     category: 'Import/Export',
     author: 'CA-Flow',
     version: '1.3',
-    installs: '21k',
-    rating: '4.9',
     tools: ['import_excel'],
   },
   {
@@ -253,8 +241,6 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     category: 'Import/Export',
     author: 'CA-Flow',
     version: '1.3',
-    installs: '15k',
-    rating: '4.8',
     tools: ['export_tally', 'export_excel'],
   },
 ];
@@ -350,7 +336,7 @@ function PluginsView({ onNavigate }: { onNavigate?: (view: View) => void }) {
                     {p.name}
                     {enabled && <span className="px-1.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px]">Enabled</span>}
                   </h4>
-                  <p className="text-[11px] text-slate-500">by {p.author} • v{p.version} • ★ {p.rating} • {p.installs}</p>
+                  <p className="text-[11px] text-slate-500">by {p.author} • v{p.version} • {p.category}</p>
                 </div>
                 <span className={`shrink-0 w-10 h-6 rounded-full p-0.5 flex transition-colors ${enabled ? 'bg-emerald-500 justify-end' : 'bg-slate-300 justify-start'}`}>
                   <span className="w-5 h-5 rounded-full bg-white shadow-sm block" />
@@ -383,7 +369,7 @@ function PluginsView({ onNavigate }: { onNavigate?: (view: View) => void }) {
               </div>
               <div className="min-w-0 flex-1">
                 <h4 className="font-semibold">{selected.name}</h4>
-                <p className="text-xs text-slate-500">by {selected.author} • v{selected.version} • {selected.category} • ★ {selected.rating} • {selected.installs} installs</p>
+                <p className="text-xs text-slate-500">by {selected.author} • v{selected.version} • {selected.category}</p>
                 <p className="text-sm text-slate-600 mt-2 leading-relaxed">{selected.longDesc}</p>
                 <p className="text-[11px] text-slate-400 mt-2 font-mono">tools: {selected.tools.join(' · ')}</p>
               </div>
@@ -894,13 +880,13 @@ export default function CAFlowDashboard() {
         setView('reconciliations');
         response = 'Switched to Reconciliations. Select a reconciliation and click Run.';
       } else if (lower.includes('export') && lower.includes('excel')) {
-        if (!needPlugin('excel') && !needPlugin('tally')) { /* fall through with disabled message */ }
+        if (!needPlugin('excel')) { /* disabled — response already set */ }
         else {
           plugin = 'excel';
           const tenantId = typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '';
           toolMeta = `export_excel(tenantId="${tenantId.slice(0, 8)}…")`;
           window.open(`/api/export?format=excel&tenantId=${encodeURIComponent(tenantId)}`, '_blank');
-          response = `✓ Excel export started — your download should begin shortly.\nIf not, use: /api/export?format=excel`;
+          response = `✓ Excel plugin called — your download should begin shortly.\nIf not, use: /api/export?format=excel`;
         }
       } else if (lower.includes('export') && lower.includes('tally')) {
         if (!needPlugin('tally')) { /* disabled */ }
@@ -909,7 +895,7 @@ export default function CAFlowDashboard() {
           const tenantId = typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '';
           toolMeta = `export_tally(tenantId="${tenantId.slice(0, 8)}…")`;
           window.open(`/api/export?format=tally&tenantId=${encodeURIComponent(tenantId)}`, '_blank');
-          response = `✓ Tally XML export started — opening download.\nIf not, use: /api/export?format=tally`;
+          response = `✓ Tally plugin called — opening download.\nIf not, use: /api/export?format=tally`;
         }
       } else if (lower.includes('verify') && lower.includes('gst')) {
         if (!needPlugin('gst')) { /* disabled */ }
@@ -919,9 +905,11 @@ export default function CAFlowDashboard() {
           if (m) {
             toolMeta = `verify_gst(gstin="${m[0]}")`;
             try {
-              const r = await fetch('/api/verify/gst', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gstin: m[0] }) });
+              const ah = getAnonHeaders() as Record<string, string>;
+              const r = await fetch('/api/verify/gst', { method: 'POST', headers: { 'Content-Type': 'application/json', ...ah }, body: JSON.stringify({ gstin: m[0] }) });
               const d = await r.json();
-              response = d.verified
+              if (!r.ok) { response = `✗ GSTIN ${m[0]} — ${d.reason || d.error || 'verification failed'}`; }
+              else response = d.verified
                 ? `✓ GSTIN ${d.gstin} VERIFIED\nState: ${d.details.state} (${d.details.stateCode})\nPAN: ${d.details.pan} (${d.details.holderType})\nEntity: ${d.details.entityCode}\n\n${d.note}`
                 : `✗ GSTIN ${m[0]} NOT VERIFIED\nReason: ${d.reason}`;
             } catch { response = 'Verification failed — network error. Try again.'; }
@@ -938,9 +926,11 @@ export default function CAFlowDashboard() {
           if (m) {
             toolMeta = `verify_pan(pan="${m[0]}")`;
             try {
-              const r = await fetch('/api/verify/pan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pan: m[0] }) });
+              const ah = getAnonHeaders() as Record<string, string>;
+              const r = await fetch('/api/verify/pan', { method: 'POST', headers: { 'Content-Type': 'application/json', ...ah }, body: JSON.stringify({ pan: m[0] }) });
               const d = await r.json();
-              response = d.verified
+              if (!r.ok) { response = `✗ PAN ${m[0]} — ${d.reason || d.error || 'verification failed'}`; }
+              else response = d.verified
                 ? `✓ PAN ${d.pan} VERIFIED\nHolder: ${d.details.holderType} (${d.details.holderCode})\nSerial: ${d.details.serial}`
                 : `✗ PAN ${m[0]} NOT VERIFIED\nReason: ${d.reason}`;
             } catch { response = 'Verification failed — network error. Try again.'; }
@@ -959,13 +949,16 @@ export default function CAFlowDashboard() {
             const text = rest.slice(rest.toLowerCase().indexOf(String(hit.name).toLowerCase()) + String(hit.name).length).trim();
             toolMeta = `send_whatsapp(to="${hit.phone}", message="${text.slice(0, 40)}…")`;
             try {
-              const r = await fetch('/api/whatsapp/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: hit.phone, message: text }) });
+              const ah = getAnonHeaders() as Record<string, string>;
+              const r = await fetch('/api/whatsapp/send', { method: 'POST', headers: { 'Content-Type': 'application/json', ...ah }, body: JSON.stringify({ to: hit.phone, message: text }) });
               const d = await r.json();
-              if (d.waLink && d.sentVia !== 'meta_api') window.open(d.waLink, '_blank');
-              response = d.sentVia === 'meta_api' ? `✓ Sent to ${hit.name} via WhatsApp Business plugin.` : `✓ WhatsApp plugin opened chat with ${hit.name} — message prefilled.\n${d.waLink}\n\nTip: set WHATSAPP_API_KEY + WHATSAPP_PHONE_ID to send fully automatically.`;
+              if (!r.ok) { response = `WhatsApp plugin error: ${d.error || 'failed'}`; }
+              else {
+                if (d.waLink && d.sentVia !== 'meta_api') window.open(d.waLink, '_blank');
+                response = d.sentVia === 'meta_api' ? `✓ Sent to ${hit.name} via WhatsApp plugin.` : `✓ WhatsApp plugin opened chat with ${hit.name} — message prefilled.\n${d.waLink}\n\nTip: set WHATSAPP_API_KEY + WHATSAPP_PHONE_ID to send fully automatically.`;
+              }
             } catch { response = 'WhatsApp send failed — network error.'; }
           } else if (rest && rest.length > 20 && !hit) {
-            // intake mode: paste bulk chat
             toolMeta = `whatsapp_intake(chars=${rest.length})`;
             response = 'WhatsApp intake: to extract transactions from bulk chats, open Plugin Store → WhatsApp → enable, then paste chats there to generate a CSV. Or say “intake from whatsapp” with the pasted block.';
           } else {
@@ -1910,9 +1903,10 @@ function ReconciliationsView({ reconciliations, documents, clients, onRun, onRef
       return;
     }
     setCreating(true);
+    const ah2 = getAnonHeaders() as Record<string, string>;
     const res = await fetch('/api/reconciliations', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...ah2 },
       body: JSON.stringify({ name: form.name, clientId: form.clientId, type: form.type, sourceADocIds: form.a, sourceBDocIds: form.b }),
     });
     const data = await res.json();
@@ -2105,8 +2099,10 @@ function ClientGstCheck({ gstin }: { gstin: string }) {
   async function check() {
     setState('checking');
     try {
-      const r = await fetch('/api/verify/gst', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gstin }) });
+      const ah = getAnonHeaders() as Record<string, string>;
+      const r = await fetch('/api/verify/gst', { method: 'POST', headers: { 'Content-Type': 'application/json', ...ah }, body: JSON.stringify({ gstin }) });
       const d = await r.json();
+      if (!r.ok) { setState('bad'); setMsg(d.reason || d.error || 'Failed'); return; }
       setState(d.verified ? 'ok' : 'bad');
       setMsg(d.verified ? `${d.details.state} • ${d.details.holderType}` : d.reason);
     } catch { setState('bad'); setMsg('Network error'); }
@@ -2128,8 +2124,10 @@ function ClientPanCheck({ pan }: { pan: string }) {
   async function check() {
     setState('checking');
     try {
-      const r = await fetch('/api/verify/pan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pan }) });
+      const ah = getAnonHeaders() as Record<string, string>;
+      const r = await fetch('/api/verify/pan', { method: 'POST', headers: { 'Content-Type': 'application/json', ...ah }, body: JSON.stringify({ pan }) });
       const d = await r.json();
+      if (!r.ok) { setState('bad'); setMsg(d.reason || d.error || 'Failed'); return; }
       setState(d.verified ? 'ok' : 'bad');
       setMsg(d.verified ? d.details.holderType : d.reason);
     } catch { setState('bad'); setMsg('Network error'); }
@@ -2152,7 +2150,8 @@ function ClientWaSend({ phone, name }: { phone: string; name: string }) {
     if (!text) return;
     setSending(true);
     try {
-      const r = await fetch('/api/whatsapp/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: phone, message: text }) });
+      const ah = getAnonHeaders() as Record<string, string>;
+      const r = await fetch('/api/whatsapp/send', { method: 'POST', headers: { 'Content-Type': 'application/json', ...ah }, body: JSON.stringify({ to: phone, message: text }) });
       const d = await r.json();
       if (!r.ok) { alert(d.error || 'Send failed'); return; }
       if (d.waLink && d.sentVia !== 'meta_api') window.open(d.waLink, '_blank');
@@ -2173,8 +2172,9 @@ function ClientEmailSend({ email, name }: { email: string; name: string }) {
   async function send() {
     setSending(true);
     try {
+      const ah = getAnonHeaders() as Record<string, string>;
       const r = await fetch('/api/email/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...ah },
         body: JSON.stringify({ to: email, subject: 'CA-Flow: Pending Documents Request', body: `Dear ${name},\n\nPlease share the pending documents for reconciliation.\n\nRegards,\nCA Team` }),
       });
       const d = await r.json();
@@ -2204,9 +2204,10 @@ function ClientsView({ clients, onRefresh, showModal, setShowModal }: any) {
       return;
     }
     setSaving(true);
+    const ah3 = getAnonHeaders() as Record<string, string>;
     const res = await fetch('/api/clients', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...ah3 },
       body: JSON.stringify(form),
     });
     const data = await res.json();

@@ -25,6 +25,8 @@ export function middleware(request: NextRequest) {
   // Data APIs — allow anonymous with x-anonymous-tenant header or tenantId query param
   if (pathname.startsWith('/api/')) {
     if (pathname.startsWith('/api/visits')) return NextResponse.next();
+    // Plugin verify APIs are public structural checks — allow without tenant (middleware would otherwise block anonymous chat)
+    if (pathname.startsWith('/api/verify/') || pathname.startsWith('/api/whatsapp/') || pathname.startsWith('/api/email/')) return NextResponse.next();
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     const anonTenant = request.headers.get('x-anonymous-tenant');
     const queryTenant = request.nextUrl.searchParams.get('tenantId');
