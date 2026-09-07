@@ -1,4 +1,18 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "npm run build"
+  "services": {
+    "ca-flow-ai": {
+      "root": ".",
+      "framework": "nextjs",
+      "buildCommand": "npm run build"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": {
+        "type": "service",
+        "service": "ca-flow-ai"
+      }
+    }
+  ]
 }
