@@ -54,11 +54,18 @@ async function execSql(sql: string): Promise<void> {
   }
 }
 
-/** Convert SQLite ? placeholders to pg $1,$2... and datetime('now') to NOW() */
+/** Convert SQLite ? placeholders to pg $1,$2... and datetime()/date() to Postgres */
 function convertPlaceholders(sql: string): string {
   let i = 0;
   let result = sql.replace(/\?/g, () => `$${++i}`);
-  result = result.replace(/datetime\('now'\)/g, 'NOW()');
+  // datetime('now', '-N minutes'/'-N days') -> NOW() - INTERVAL 'N ...'
+  result = result.replace(/datetime\('now',\s*'-(\d+)\s*minutes?'\)/gi, "NOW() - INTERVAL '$1 minutes'");
+  result = result.replace(/datetime\('now',\s*'-(\d+)\s*days?'\)/gi, "NOW() - INTERVAL '$1 days'");
+  result = result.replace(/datetime\('now',\s*'-(\d+)\s*hours?'\)/gi, "NOW() - INTERVAL '$1 hours'");
+  result = result.replace(/datetime\('now'\)/gi, 'NOW()');
+  // date('now') -> CURRENT_DATE, date(col) -> DATE(col)
+  result = result.replace(/date\('now'\)/gi, 'CURRENT_DATE');
+  result = result.replace(/\bdate\s*\(\s*created_at\s*\)/gi, 'DATE(created_at)');
   result = result.replace(/AUTOINCREMENT/g, '');
   return result;
 }
