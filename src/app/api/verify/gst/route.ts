@@ -69,6 +69,8 @@ export async function POST(request: NextRequest) {
       } catch { live = null; }
     }
 
+    // log activity (best effort, tenant may be anon)
+    try { const { logActivity } = await import('@/lib/activity'); await logActivity(request as any, 'verify.gst', { entity_type: 'gstin', entity_id: raw, entity_name: raw, details: { verified: true, state: STATE_CODES[stateCode], pan: panPart } }); } catch {}
     return NextResponse.json({
       verified: true,
       status: 'verified',

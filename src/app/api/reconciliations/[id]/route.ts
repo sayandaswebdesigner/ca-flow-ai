@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runReconciliation } from '@/lib/reconciliation';
 import { getRequestTenant } from '@/lib/auth';
+import { logActivity } from '@/lib/activity';
 
 export async function POST(
   request: NextRequest,
@@ -13,6 +14,7 @@ export async function POST(
     const owner = (await getDbAsync()).prepare('SELECT id FROM reconciliations WHERE id = ? AND tenant_id = ?').get(id, tenantId) as any;
     if (!owner) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const result = await runReconciliation(id);
+    await logActivity(request, 'reconciliation.run', { entity_type: 'reconciliation', entity_id: id, details: { matched: result.matched.length, exceptions: result.exceptions.length, stats: result.stats } });
 
     return NextResponse.json({
       matchedCount: result.matched.length,

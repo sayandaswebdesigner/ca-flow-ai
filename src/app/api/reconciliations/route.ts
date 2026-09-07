@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbAsync } from '@/lib/db';
 import { getRequestTenant } from '@/lib/auth';
+import { logActivity } from '@/lib/activity';
 import { v4 as uuid } from 'uuid';
 import { runReconciliation } from '@/lib/reconciliation';
 
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
       VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, 'system')
     `).run(id, tenantId, clientId, name, type || 'bank', JSON.stringify(sourceADocIds), JSON.stringify(sourceBDocIds));
 
+    await logActivity(request, 'reconciliation.created', { entity_type: 'reconciliation', entity_id: id, entity_name: name, details: { clientId, type } });
     return NextResponse.json({ reconciliationId: id });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

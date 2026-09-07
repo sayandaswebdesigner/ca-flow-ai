@@ -6,6 +6,7 @@ import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { parseCSV, parseExcel, classifyDocument, parseInvoiceText, extractUTR, getBankLabel } from '@/lib/parser';
+import { logActivity } from '@/lib/activity';
 
 async function ensureTenant(db: any, tenantId: string) {
   const t = await db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId);
@@ -163,6 +164,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    for (const r of results) {
+      await logActivity(request, 'document.uploaded', { entity_type: 'document', entity_id: r.documentId, entity_name: r.fileName, details: { type: r.type, bank: r.bankLabel, transactions: r.transactionCount } });
+    }
     return NextResponse.json({ documents: results });
   } catch (error: any) {
     console.error('Upload error:', error);
@@ -203,6 +207,7 @@ export async function DELETE(request: NextRequest) {
     await db.prepare('DELETE FROM transactions WHERE source_document_id = ?').run(id);
     await db.prepare('DELETE FROM documents WHERE id = ?').run(id);
     if (doc.storage_path) await unlink(doc.storage_path).catch(() => {});
+    await logActivity(request, 'document.deleted', { entity_type: 'document', entity_id: id, entity_name: doc.file_name });
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

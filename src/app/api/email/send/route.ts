@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
       sentVia = 'mailto_handoff'; // keep handoff until nodemailer dep is added
     }
 
+    try { const { logActivity } = await import('@/lib/activity'); await logActivity(request as any, 'email.sent', { entity_type: 'email', entity_id: to, entity_name: to, details: { subject, sentVia } }); } catch {}
     return NextResponse.json({ ok: true, mailto, sentVia, to, note: 'Opens in the firm mail app with subject+body prefilled. Set SMTP_HOST/USER/PASS (+ nodemailer) for one-click server send.' });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

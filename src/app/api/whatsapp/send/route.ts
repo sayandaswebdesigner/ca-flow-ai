@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
       } catch { /* fall through to deep_link */ }
     }
 
+    try { const { logActivity } = await import('@/lib/activity'); await logActivity(request as any, 'whatsapp.sent', { entity_type: 'whatsapp', entity_id: to, entity_name: to, details: { sentVia, message: message.slice(0, 200) } }); } catch {}
     return NextResponse.json({ ok: true, waLink, sentVia, metaId, to, note: sentVia === 'deep_link' ? 'Opened via wa.me — set WHATSAPP_API_KEY + WHATSAPP_PHONE_ID for fully automatic send.' : 'Sent via Meta WhatsApp Business API.' });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

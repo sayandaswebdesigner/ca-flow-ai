@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
     if (!holderType)
       return NextResponse.json({ verified: false, status: 'not_verified', pan: raw, reason: `4th char ${holderCode} is not a valid holder type` });
 
+    try { const { logActivity } = await import('@/lib/activity'); await logActivity(request as any, 'verify.pan', { entity_type: 'pan', entity_id: raw, entity_name: raw, details: { holderType } }); } catch {}
     return NextResponse.json({
       verified: true,
       status: 'verified',

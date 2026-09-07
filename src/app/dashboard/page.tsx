@@ -518,14 +518,43 @@ function ChatbotView({ messages, input, setInput, onSend, loading, chatEndRef }:
   );
 }
 
-// ==================== HISTORY VIEW ====================
+// ==================== HISTORY VIEW — now backed by persistent activity log ====================
 function HistoryView({ transactions, reconciliations, clients }: { transactions: any[]; reconciliations: any[]; clients: any[] }) {
-  const [filter, setFilter] = useState<'all' | 'transactions' | 'reconciliations'>('all');
+  const [activities, setActivities] = useState<any[] | null>(null);
+  const [filter, setFilter] = useState<'all' | 'transactions' | 'reconciliations' | 'activities'>('activities');
   const [search, setSearch] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loadingActs, setLoadingActs] = useState(true);
 
+  useEffect(() => {
+    const logged = typeof window !== 'undefined' && localStorage.getItem('ca_logged_in') === 'true';
+    setIsLoggedIn(logged);
+    const h = getAnonHeaders() as Record<string, string>;
+    fetch('/api/activities?limit=100', { headers: h })
+      .then((r) => r.json())
+      .then((d) => { if (Array.isArray(d.activities)) setActivities(d.activities); else setActivities([]); })
+      .catch(() => setActivities([]))
+      .finally(() => setLoadingActs(false));
+  }, [transactions.length, reconciliations.length]);
+
+  // Fallback combined records for offline/search when activities not yet loaded
   const allRecords = useMemo(() => {
+    if (filter === 'activities' && activities) {
+      const filtered = activities.filter((a: any) => {
+        if (!search) return true;
+        const q = search.toLowerCase();
+        return String(a.action).toLowerCase().includes(q) || String(a.entity_name || '').toLowerCase().includes(q) || String(a.details || '').toLowerCase().includes(q);
+      });
+      return filtered.map((a: any) => ({
+        type: 'activity',
+        date: a.created_at,
+        description: `${a.action} — ${a.entity_name || a.entity_id || ''}`.trim(),
+        status: a.action,
+        id: a.id,
+        raw: a,
+      }));
+    }
     const records: { type: string; date: string; description: string; amount?: number; status: string; client?: string; id: string }[] = [];
-
     if (filter === 'all' || filter === 'transactions') {
       transactions.forEach((t) => {
         records.push({
@@ -539,7 +568,6 @@ function HistoryView({ transactions, reconciliations, clients }: { transactions:
         });
       });
     }
-
     if (filter === 'all' || filter === 'reconciliations') {
       reconciliations.forEach((r) => {
         records.push({
@@ -552,9 +580,7 @@ function HistoryView({ transactions, reconciliations, clients }: { transactions:
         });
       });
     }
-
     records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
     if (search) {
       const q = search.toLowerCase();
       return records.filter((r) =>
@@ -563,12 +589,17 @@ function HistoryView({ transactions, reconciliations, clients }: { transactions:
         r.status.toLowerCase().includes(q)
       );
     }
-
     return records;
-  }, [transactions, reconciliations, clients, filter, search]);
+  }, [transactions, reconciliations, clients, filter, search, activities]);
 
-  const typeIcon = (type: string) => type === 'transaction' ? <ArrowLeftRight size={14} /> : <BarChart3 size={14} />;
-  const typeColor = (type: string) => type === 'transaction' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-violet-50 text-violet-700 border-violet-200';
+  const typeIcon = (type: string) => {
+    if (type === 'activity') return <Activity size={14} />;
+    return type === 'transaction' ? <ArrowLeftRight size={14} /> : <BarChart3 size={14} />;
+  };
+  const typeColor = (type: string) => {
+    if (type === 'activity') return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    return type === 'transaction' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-violet-50 text-violet-700 border-violet-200';
+  };
   const statusColor = (status: string) => {
     if (status === 'matched' || status === 'completed') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
     if (status === 'unmatched' || status === 'draft') return 'bg-amber-50 text-amber-700 border-amber-100';
@@ -580,14 +611,31 @@ function HistoryView({ transactions, reconciliations, clients }: { transactions:
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <div>
-          <h3 className="text-xl font-semibold tracking-tight">History</h3>
-          <p className="text-sm text-slate-500">{allRecords.length} records • {transactions.length} transactions • {reconciliations.length} reconciliations</p>
+          <h3 className="text-xl font-semibold tracking-tight">History — Activity Timeline</h3>
+          <p className="text-sm text-slate-500">
+            {filter === 'activities' ? `${allRecords.length} activities` : `${allRecords.length} records`} • {transactions.length} transactions • {reconciliations.length} reconciliations {activities ? `• ${activities.length} tracked activities` : ''}
+          </p>
+          {!isLoggedIn && <p className="text-xs text-amber-600 mt-1">You are anonymous — history is tied to this browser only. <a href="/signup" className="underline font-medium">Sign up</a> to persist across devices.</p>}
+          {isLoggedIn && <p className="text-xs text-emerald-600 mt-1">✓ Logged in — all actions are persisted to your account and visible here.</p>}
         </div>
+        <button
+          onClick={() => {
+            const h = getAnonHeaders() as Record<string, string>;
+            setLoadingActs(true);
+            fetch('/api/activities?limit=100', { headers: h })
+              .then((r) => r.json())
+              .then((d) => { if (Array.isArray(d.activities)) setActivities(d.activities); })
+              .finally(() => setLoadingActs(false));
+          }}
+          className="ml-auto px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium hover:bg-slate-50"
+        >
+          ↻ Refresh
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-3">
         <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-          {(['all', 'transactions', 'reconciliations'] as const).map((f) => (
+          {(['activities', 'all', 'transactions', 'reconciliations'] as const).map((f) => (
             <button key={f} onClick={() => setFilter(f)} className={cls('px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize', filter === f ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
               {f}
             </button>
@@ -595,9 +643,10 @@ function HistoryView({ transactions, reconciliations, clients }: { transactions:
         </div>
         <div className="relative flex-1 max-w-xs">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search history…" className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-50" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={filter === 'activities' ? 'Search actions, entities…' : 'Search history…'} className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-50" />
         </div>
       </div>
+      {loadingActs && filter === 'activities' && <p className="text-xs text-slate-400">Loading activities…</p>}
 
       {allRecords.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center shadow-sm">
@@ -610,7 +659,7 @@ function HistoryView({ transactions, reconciliations, clients }: { transactions:
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="divide-y divide-slate-100">
-            {allRecords.map((r) => (
+            {allRecords.map((r: any) => (
               <div key={`${r.type}-${r.id}`} className="px-5 py-3.5 flex items-center gap-3 hover:bg-slate-50 transition-colors">
                 <div className={cls('w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0', typeColor(r.type))}>
                   {typeIcon(r.type)}
@@ -621,6 +670,7 @@ function HistoryView({ transactions, reconciliations, clients }: { transactions:
                     {r.client && <span>{r.client} • </span>}
                     {new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
+                  {r.raw?.details && <p className="text-[11px] text-slate-400 truncate">{String(r.raw.details).slice(0, 120)}</p>}
                 </div>
                 {r.amount !== undefined && (
                   <span className={cls('text-sm font-medium', r.amount >= 0 ? 'text-emerald-600' : 'text-red-600')}>

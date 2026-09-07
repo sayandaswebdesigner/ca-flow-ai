@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbAsync } from '@/lib/db';
 import { hashPassword, validateEmail, validatePassword, createSession, createUserWithTenant, SESSION_COOKIE } from '@/lib/auth';
+import { v4 as uuid } from 'uuid';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,7 +20,14 @@ export async function POST(request: NextRequest) {
     const hash = await hashPassword(password);
     const user = await createUserWithTenant(name, email, hash);
     const token = await createSession(user.id);
-
+    try {
+      const db2 = await getDbAsync();
+      await db2.prepare(`INSERT INTO activities (id, tenant_id, user_id, action, entity_type, entity_id, entity_name, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        uuid(), user.tenantId, user.id, 'user.signup', 'user', user.id, user.email,
+        request.headers.get('x-forwarded-for')?.split(',')[0] || null,
+        request.headers.get('user-agent') || null
+      );
+    } catch {}
     const res = NextResponse.json({ success: true, user: { id: user.id, name: user.name, email: user.email } });
     res.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true,

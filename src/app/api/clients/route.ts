@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbAsync } from '@/lib/db';
 import { getRequestTenant } from '@/lib/auth';
+import { logActivity } from '@/lib/activity';
 import { v4 as uuid } from 'uuid';
 
 export async function GET(request: NextRequest) {
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(id, tenantId, name.trim(), gstin?.trim() || null, pan?.trim().toUpperCase() || null, email?.trim() || null, phone?.trim() || null);
 
+    await logActivity(request, 'client.created', { entity_type: 'client', entity_id: id, entity_name: name.trim(), details: { gstin, pan } });
     return NextResponse.json({ clientId: id });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -60,6 +62,7 @@ export async function DELETE(request: NextRequest) {
     const hasDocs = await db.prepare('SELECT id FROM documents WHERE client_id = ? LIMIT 1').get(id);
     if (hasDocs) return NextResponse.json({ error: 'Cannot delete: client has documents. Delete documents first.' }, { status: 400 });
     await db.prepare('DELETE FROM clients WHERE id = ? AND tenant_id = ?').run(id, tenantId);
+    await logActivity(request, 'client.deleted', { entity_type: 'client', entity_id: id });
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
