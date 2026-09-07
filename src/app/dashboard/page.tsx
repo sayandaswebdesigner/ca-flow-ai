@@ -864,7 +864,7 @@ export default function CAFlowDashboard() {
                 <span className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 text-sm">✓</span>
                 <p className="text-xs font-semibold tracking-wide text-emerald-700 uppercase">Genuine reviews only</p>
               </div>
-              <h4 className="text-xl font-semibold mt-3 tracking-tight">Share your honest experience</h4>
+              <h4 className="text-xl font-semibold mt-3 tracking-tight">Share Your Valuable Feedback</h4>
               <p className="text-sm text-slate-500 mt-1">Verified usage only. We show both good and critical feedback — it helps everyone.</p>
               <button onClick={() => setShowReviewModal({ ...showReviewModal, open: false })} className="absolute top-4 right-4 p-2 rounded-xl hover:bg-slate-100">
                 <X size={16} />
