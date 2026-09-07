@@ -26,8 +26,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Data APIs — allow anonymous with x-anonymous-tenant header
+  // Data APIs — allow anonymous with x-anonymous-tenant header (visits is global public)
   if (pathname.startsWith('/api/')) {
+    if (pathname.startsWith('/api/visits')) return NextResponse.next();
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     const anonTenant = request.headers.get('x-anonymous-tenant');
     if (!token && !anonTenant) {
