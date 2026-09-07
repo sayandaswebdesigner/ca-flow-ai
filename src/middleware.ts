@@ -5,12 +5,15 @@ const SESSION_COOKIE = 'ca_session';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public routes — always accessible (root is public landing, dashboard is private)
+  // Root -> dashboard redirect (fix RSC blank)
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/dashboard', request.url), 307);
+  }
+
+  // Public routes — always accessible
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/signup') ||
-    pathname.startsWith('/admin/login') ||
-    pathname.startsWith('/api/admin/') ||
     pathname.startsWith('/api/auth/') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico'
@@ -18,12 +21,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Dashboard — private if ADMIN_PASSWORD set (only you)
+  // Dashboard — fully public (anonymous users allowed)
   if (pathname.startsWith('/dashboard')) {
-    if (process.env.ADMIN_PASSWORD) {
-      const ok = request.cookies.get('admin_auth')?.value === '1';
-      if (!ok) return NextResponse.redirect(new URL('/admin/login', request.url));
-    }
     return NextResponse.next();
   }
 
@@ -41,5 +40,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/dashboard/:path*', '/login', '/signup', '/admin/:path*', '/api/:path*'],
+  matcher: ['/', '/dashboard/:path*', '/login', '/signup', '/api/:path*'],
 };
