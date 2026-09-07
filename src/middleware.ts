@@ -14,6 +14,8 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/signup') ||
+    pathname.startsWith('/admin/login') ||
+    pathname.startsWith('/api/admin/') ||
     pathname.startsWith('/api/auth/') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico'
@@ -21,8 +23,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Dashboard — fully public (anonymous users allowed)
+  // Dashboard — private if ADMIN_PASSWORD set (only you)
   if (pathname.startsWith('/dashboard')) {
+    if (process.env.ADMIN_PASSWORD) {
+      const ok = request.cookies.get('admin_auth')?.value === '1';
+      if (!ok) return NextResponse.redirect(new URL('/admin/login', request.url));
+    }
     return NextResponse.next();
   }
 
@@ -40,5 +46,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/dashboard/:path*', '/login', '/signup', '/api/:path*'],
+  matcher: ['/', '/dashboard/:path*', '/login', '/signup', '/admin/:path*', '/api/:path*'],
 };

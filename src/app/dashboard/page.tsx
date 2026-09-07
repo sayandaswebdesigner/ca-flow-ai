@@ -41,7 +41,7 @@ import {
 } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
-type View = 'dashboard' | 'documents' | 'transactions' | 'reconciliations' | 'clients' | 'insights' | 'reviews' | 'plugins' | 'assistant';
+type View = 'dashboard' | 'documents' | 'transactions' | 'reconciliations' | 'clients' | 'insights' | 'reviews' | 'plugins' | 'assistant' | 'activities';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview' },
@@ -53,6 +53,7 @@ const NAV_ITEMS = [
   { id: 'reviews', label: 'Reviews', icon: Sparkles, desc: 'Wall & capture' },
   { id: 'plugins', label: 'Plugins', icon: Puzzle, desc: 'Integrations' },
   { id: 'assistant', label: 'Assistant', icon: Bot, desc: 'AI chat' },
+  { id: 'activities', label: 'Activities', icon: Bell, desc: 'Live log' },
 ] as const;
 
 // ---------- helpers ----------
@@ -142,6 +143,50 @@ function UserMenu() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function ActivitiesView({ visits, documents, transactions }: any) {
+  const total = visits?.total ?? 0;
+  const unique = visits?.unique ?? 0;
+  const today = visits?.today ?? 0;
+  const recent = visits?.recent || [];
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl bg-slate-900 text-white p-6 lg:p-8 relative overflow-hidden">
+        <div className="absolute -right-10 -top-10 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+        <div className="relative">
+          <p className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/10 border border-white/20">🔒 Private — owner only</p>
+          <h3 className="text-2xl font-semibold mt-3">Activities — Live log</h3>
+          <p className="text-slate-300 text-sm mt-1">Real-time visits, uploads, transactions. Only you see this.</p>
+          <div className="mt-4 flex flex-wrap gap-3 text-xs">
+            <span className="px-3 py-1.5 rounded-full bg-white text-slate-900 font-medium">{total} visits total</span>
+            <span className="px-3 py-1.5 rounded-full bg-white/10 border border-white/20">{unique} unique IPs</span>
+            <span className="px-3 py-1.5 rounded-full bg-emerald-500 text-white">{today} today</span>
+            <span className="px-3 py-1.5 rounded-full bg-white/10 border border-white/20">{documents?.length || 0} docs</span>
+            <span className="px-3 py-1.5 rounded-full bg-white/10 border border-white/20">{transactions?.length || 0} tx</span>
+          </div>
+        </div>
+      </div>
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h4 className="font-semibold text-sm">Recent visits (global, live)</h4>
+          <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">{recent.length} shown</span>
+        </div>
+        {recent.length === 0 ? <p className="p-8 text-sm text-slate-500 text-center">No visits yet — share your link.</p> : (
+          <div className="divide-y divide-slate-100">
+            {recent.map((v: any) => (
+              <div key={v.id} className="px-5 py-3 flex items-center gap-3 text-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">{v.ip}</span>
+                <span className="text-slate-600 truncate flex-1">{v.path} • {v.city || '—'} {v.country || ''}</span>
+                <span className="text-xs text-slate-400 hidden sm:block">{new Date(v.created_at).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -843,6 +888,7 @@ export default function CAFlowDashboard() {
               {view === 'reviews' && <ReviewsView reviews={reviews} visits={visits} onSubmit={submitReview} onRefresh={loadAll} />}
               {view === 'plugins' && <PluginsView />}
               {view === 'assistant' && <ChatbotView messages={chatMessages} input={chatInput} setInput={setChatInput} onSend={handleChat} loading={chatLoading} chatEndRef={chatEndRef} />}
+              {view === 'activities' && <ActivitiesView visits={visits} documents={documents} transactions={transactions} />}
             </>
           )}
         </main>
