@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     }
 
     query += ' ORDER BY created_at DESC';
-    const recons = db.prepare(query).all(...params);
+    const recons = await db.prepare(query).all(...params);
 
     return NextResponse.json({ reconciliations: recons });
   } catch (error: any) {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     const id = uuid();
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO reconciliations (id, tenant_id, client_id, name, type, status, source_a_doc_ids, source_b_doc_ids, created_by)
       VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, 'system')
     `).run(id, tenantId, clientId, name, type || 'bank', JSON.stringify(sourceADocIds), JSON.stringify(sourceBDocIds));

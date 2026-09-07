@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const tenantId = await getRequestTenant(request);
 
-    const clients = db.prepare('SELECT * FROM clients WHERE tenant_id = ? ORDER BY name').all(tenantId);
+    const clients = await db.prepare('SELECT * FROM clients WHERE tenant_id = ? ORDER BY name').all(tenantId);
     return NextResponse.json({ clients });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -35,11 +35,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid email' }, { status: 400 });
     }
     // Ensure tenant exists
-    const t = db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId);
-    if (!t) db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, 'My Firm', 'professional');
+    const t = await db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId);
+    if (!t) await db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, 'My Firm', 'professional');
 
     const id = uuid();
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO clients (id, tenant_id, name, gstin, pan, email, phone)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(id, tenantId, name.trim(), gstin?.trim() || null, pan?.trim().toUpperCase() || null, email?.trim() || null, phone?.trim() || null);
@@ -57,9 +57,9 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
     const tenantId = await getRequestTenant(request);
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
-    const hasDocs = db.prepare('SELECT id FROM documents WHERE client_id = ? LIMIT 1').get(id);
+    const hasDocs = await db.prepare('SELECT id FROM documents WHERE client_id = ? LIMIT 1').get(id);
     if (hasDocs) return NextResponse.json({ error: 'Cannot delete: client has documents. Delete documents first.' }, { status: 400 });
-    db.prepare('DELETE FROM clients WHERE id = ? AND tenant_id = ?').run(id, tenantId);
+    await db.prepare('DELETE FROM clients WHERE id = ? AND tenant_id = ?').run(id, tenantId);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

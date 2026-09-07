@@ -9,13 +9,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const tenantId = await getRequestTenant(request);
 
-    const transactions = db
+    const transactions = await db
       .prepare('SELECT * FROM transactions WHERE tenant_id = ? ORDER BY date DESC LIMIT 500')
       .all(tenantId) as any[];
-    const clients = db
+    const clients = await db
       .prepare('SELECT id, name, phone FROM clients WHERE tenant_id = ?')
       .all(tenantId) as any[];
-    const documents = db
+    const documents = await db
       .prepare('SELECT client_id, document_type FROM documents WHERE tenant_id = ?')
       .all(tenantId) as any[];
 

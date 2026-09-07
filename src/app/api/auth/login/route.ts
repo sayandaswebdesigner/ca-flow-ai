@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     if (!password) return NextResponse.json({ error: 'Password required' }, { status: 400 });
 
     const db = await getDbAsync();
-    const user = db.prepare('SELECT id, tenant_id as tenantId, name, email, password_hash as passwordHash FROM users WHERE email = ?').get(
+    const user = await db.prepare('SELECT id, tenant_id as tenantId, name, email, password_hash as passwordHash FROM users WHERE email = ?').get(
       email.trim().toLowerCase()
     ) as any;
     // Generic message to avoid user enumeration

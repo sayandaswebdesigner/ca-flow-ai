@@ -383,12 +383,12 @@ async function initPg(): Promise<DbAdapter> {
   return {
     prepare(sql: string) {
       return {
-        get(...params: any[]) { return queryOne(sql, params); },
-        all(...params: any[]) { return queryAll(sql, params); },
-        run(...params: any[]) { return queryRun(sql, params); },
+        get(...params: any[]) { return queryOne(sql, params) as any; },
+        all(...params: any[]) { return queryAll(sql, params) as any; },
+        run(...params: any[]) { return queryRun(sql, params) as any; },
       };
     },
-    exec(sql: string) { execSql(sql); },
+    exec(sql: string) { execSql(sql) as any; },
   };
 }
 

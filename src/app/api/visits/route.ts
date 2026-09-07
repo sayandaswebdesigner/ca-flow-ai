@@ -9,15 +9,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const tenantId = await getRequestTenant(request);
 
-    const total = (db.prepare('SELECT COUNT(*) as c FROM visits WHERE tenant_id = ?').get(tenantId) as any).c as number;
-    const unique = (db.prepare('SELECT COUNT(DISTINCT ip) as c FROM visits WHERE tenant_id = ?').get(tenantId) as any).c as number;
-    const today = (db.prepare("SELECT COUNT(*) as c FROM visits WHERE tenant_id = ? AND date(created_at) = date('now')").get(tenantId) as any).c as number;
-    const last7 = db
+    const total = (await db.prepare('SELECT COUNT(*) as c FROM visits WHERE tenant_id = ?').get(tenantId) as any).c as number;
+    const unique = (await db.prepare('SELECT COUNT(DISTINCT ip) as c FROM visits WHERE tenant_id = ?').get(tenantId) as any).c as number;
+    const today = (await db.prepare("SELECT COUNT(*) as c FROM visits WHERE tenant_id = ? AND date(created_at) = date('now')").get(tenantId) as any).c as number;
+    const last7 = await db
       .prepare(
         "SELECT date(created_at) as d, COUNT(*) as c FROM visits WHERE tenant_id = ? AND created_at >= datetime('now', '-7 days') GROUP BY date(created_at) ORDER BY d"
       )
       .all(tenantId) as any[];
-    const recent = db.prepare('SELECT * FROM visits WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 20').all(tenantId) as any[];
+    const recent = await db.prepare('SELECT * FROM visits WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 20').all(tenantId) as any[];
 
     return NextResponse.json({ total, unique, today, last7, recent });
   } catch (error: any) {
@@ -39,15 +39,15 @@ export async function POST(request: NextRequest) {
     const city = hdr.get('cf-ipcity') || hdr.get('x-vercel-ip-city') || null;
 
     // dedup: same ip + path within 5 min = ignore
-    const recent = db
+    const recent = await db
       .prepare("SELECT id FROM visits WHERE ip = ? AND path = ? AND created_at >= datetime('now', '-5 minutes') LIMIT 1")
       .get(ip, path) as any;
     if (recent) return NextResponse.json({ deduped: true });
 
-    const t = db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId) as any;
-    if (!t) db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, 'My Firm', 'professional');
+    const t = await db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId) as any;
+    if (!t) await db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, 'My Firm', 'professional');
 
-    db.prepare('INSERT INTO visits (id, tenant_id, ip, user_agent, path, country, city) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+    await db.prepare('INSERT INTO visits (id, tenant_id, ip, user_agent, path, country, city) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
       uuid(),
       tenantId,
       ip,

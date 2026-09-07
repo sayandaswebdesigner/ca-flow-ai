@@ -10,12 +10,12 @@ export async function GET(request: NextRequest) {
     const tenantId = await getRequestTenant(request);
     const limit = Math.min(100, parseInt(searchParams.get('limit') || '50'));
 
-    const reviews = db
+    const reviews = await db
       .prepare('SELECT * FROM reviews WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?')
       .all(tenantId, limit) as any[];
 
-    const agg = db.prepare('SELECT COUNT(*) as count, AVG(rating) as avg FROM reviews WHERE tenant_id = ?').get(tenantId) as any;
-    const distRows = db.prepare('SELECT rating, COUNT(*) as c FROM reviews WHERE tenant_id = ? GROUP BY rating').all(tenantId) as any[];
+    const agg = await db.prepare('SELECT COUNT(*) as count, AVG(rating) as avg FROM reviews WHERE tenant_id = ?').get(tenantId) as any;
+    const distRows = await db.prepare('SELECT rating, COUNT(*) as c FROM reviews WHERE tenant_id = ? GROUP BY rating').all(tenantId) as any[];
     const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     for (const r of distRows) dist[r.rating] = r.c;
 
@@ -48,11 +48,11 @@ export async function POST(request: NextRequest) {
     if (cleanText && cleanText.length < 3) return NextResponse.json({ error: 'Text too short' }, { status: 400 });
 
     // Ensure tenant
-    const t = db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId);
-    if (!t) db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, 'My Firm', 'professional');
+    const t = await db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId);
+    if (!t) await db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, 'My Firm', 'professional');
 
     const id = uuid();
-    db.prepare(
+    await db.prepare(
       `INSERT INTO reviews (id, tenant_id, client_id, rating, text, author_name, author_role, is_public, source)
        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
     ).run(id, tenantId, clientId || null, r, cleanText || null, (author_name || 'CA User').slice(0, 80), (author_role || 'ca').slice(0, 20), source);

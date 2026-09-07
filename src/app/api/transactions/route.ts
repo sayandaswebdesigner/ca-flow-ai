@@ -26,12 +26,12 @@ export async function GET(request: NextRequest) {
     }
 
     const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as count');
-    const total = (db.prepare(countQuery).get(...params) as any).count;
+    const total = (await db.prepare(countQuery).get(...params) as any).count;
 
     query += ' ORDER BY date DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
-    const transactions = db.prepare(query).all(...params);
+    const transactions = await db.prepare(query).all(...params);
 
     return NextResponse.json({ transactions, total, page, limit });
   } catch (error: any) {
@@ -60,7 +60,7 @@ export async function PATCH(request: NextRequest) {
     updates.push("updated_at = datetime('now')");
     params.push(id, tenantId);
 
-    db.prepare(`UPDATE transactions SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`).run(...params);
+    await db.prepare(`UPDATE transactions SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`).run(...params);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

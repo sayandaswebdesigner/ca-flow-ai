@@ -9,24 +9,24 @@ export async function GET(request: NextRequest) {
     const tenantId = await getRequestTenant(request);
 
     // Dashboard stats
-    const totalClients = (db.prepare('SELECT COUNT(*) as count FROM clients WHERE tenant_id = ?').get(tenantId) as any).count;
-    const totalDocuments = (db.prepare('SELECT COUNT(*) as count FROM documents WHERE tenant_id = ?').get(tenantId) as any).count;
-    const totalTransactions = (db.prepare('SELECT COUNT(*) as count FROM transactions WHERE tenant_id = ?').get(tenantId) as any).count;
-    const totalReconciliations = (db.prepare('SELECT COUNT(*) as count FROM reconciliations WHERE tenant_id = ?').get(tenantId) as any).count;
-    const completedReconciliations = (db.prepare("SELECT COUNT(*) as count FROM reconciliations WHERE tenant_id = ? AND status = 'completed'").get(tenantId) as any).count;
-    const totalMatched = (db.prepare("SELECT COUNT(*) as count FROM transactions WHERE tenant_id = ? AND status = 'matched'").get(tenantId) as any).count;
-    const totalExceptions = (db.prepare("SELECT COUNT(*) as count FROM transactions WHERE tenant_id = ? AND status = 'exception'").get(tenantId) as any).count;
-    const unmatchedAmount = (db.prepare("SELECT COALESCE(SUM(ABS(amount)), 0) as total FROM transactions WHERE tenant_id = ? AND status = 'unmatched'").get(tenantId) as any).total;
+    const totalClients = (await db.prepare('SELECT COUNT(*) as count FROM clients WHERE tenant_id = ?').get(tenantId) as any).count;
+    const totalDocuments = (await db.prepare('SELECT COUNT(*) as count FROM documents WHERE tenant_id = ?').get(tenantId) as any).count;
+    const totalTransactions = (await db.prepare('SELECT COUNT(*) as count FROM transactions WHERE tenant_id = ?').get(tenantId) as any).count;
+    const totalReconciliations = (await db.prepare('SELECT COUNT(*) as count FROM reconciliations WHERE tenant_id = ?').get(tenantId) as any).count;
+    const completedReconciliations = (await db.prepare("SELECT COUNT(*) as count FROM reconciliations WHERE tenant_id = ? AND status = 'completed'").get(tenantId) as any).count;
+    const totalMatched = (await db.prepare("SELECT COUNT(*) as count FROM transactions WHERE tenant_id = ? AND status = 'matched'").get(tenantId) as any).count;
+    const totalExceptions = (await db.prepare("SELECT COUNT(*) as count FROM transactions WHERE tenant_id = ? AND status = 'exception'").get(tenantId) as any).count;
+    const unmatchedAmount = (await db.prepare("SELECT COALESCE(SUM(ABS(amount)), 0) as total FROM transactions WHERE tenant_id = ? AND status = 'unmatched'").get(tenantId) as any).total;
 
     // Recent activity
-    const recentDocs = db.prepare('SELECT * FROM documents WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 5').all(tenantId);
-    const recentRecons = db.prepare('SELECT * FROM reconciliations WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 5').all(tenantId);
+    const recentDocs = await db.prepare('SELECT * FROM documents WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 5').all(tenantId);
+    const recentRecons = await db.prepare('SELECT * FROM reconciliations WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 5').all(tenantId);
 
     // Document type breakdown
-    const docTypes = db.prepare('SELECT document_type, COUNT(*) as count FROM documents WHERE tenant_id = ? GROUP BY document_type').all(tenantId);
+    const docTypes = await db.prepare('SELECT document_type, COUNT(*) as count FROM documents WHERE tenant_id = ? GROUP BY document_type').all(tenantId);
 
     // Transaction status breakdown
-    const txStatuses = db.prepare('SELECT status, COUNT(*) as count FROM transactions WHERE tenant_id = ? GROUP BY status').all(tenantId);
+    const txStatuses = await db.prepare('SELECT status, COUNT(*) as count FROM transactions WHERE tenant_id = ? GROUP BY status').all(tenantId);
 
     return NextResponse.json({
       stats: {

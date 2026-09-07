@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     if (pwErr) return NextResponse.json({ error: pwErr }, { status: 400 });
 
     const db = await getDbAsync();
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim().toLowerCase());
+    const existing = await db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim().toLowerCase());
     if (existing) return NextResponse.json({ error: 'Email already registered — please log in' }, { status: 409 });
 
     const hash = await hashPassword(password);

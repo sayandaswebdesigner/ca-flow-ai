@@ -7,9 +7,9 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import { parseCSV, parseExcel, classifyDocument, parseInvoiceText } from '@/lib/parser';
 
-function ensureTenant(db: any, tenantId: string) {
-  const t = db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId);
-  if (!t) db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, 'My Firm', 'professional');
+async function ensureTenant(db: any, tenantId: string) {
+  const t = await db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId);
+  if (!t) await db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, 'My Firm', 'professional');
 }
 
 function parseTransactionsFromPdfText(text: string): { date: string; description: string; amount: number; reference?: string }[] {
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     const db = await getDbAsync();
     ensureTenant(db, tenantId);
 
-    const client = db.prepare('SELECT id FROM clients WHERE id = ? AND tenant_id = ?').get(clientId, tenantId);
+    const client = await db.prepare('SELECT id FROM clients WHERE id = ? AND tenant_id = ?').get(clientId, tenantId);
     if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 });
 
     const uploadDir = join(process.cwd(), 'uploads');
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         if (docType === 'other' && transactions.length > 0) docType = 'bank_statement';
       }
 
-      db.prepare(
+      await db.prepare(
         `INSERT INTO documents (id, tenant_id, client_id, file_name, mime_type, storage_path, file_size, status, document_type, classification_confidence, extracted_data, processed_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
       ).run(
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
       for (const tx of transactions) {
         // Validate date and amount
         if (!tx.date || isNaN(Date.parse(tx.date)) || !tx.amount || isNaN(tx.amount)) continue;
-        insertTx.run(uuid(), tenantId, clientId, docId, sourceType, tx.date, (tx.description || 'Transaction').slice(0, 200), tx.amount, tx.reference || null, tx.counterparty || null);
+        await insertTx.run(uuid(), tenantId, clientId, docId, sourceType, tx.date, (tx.description || 'Transaction').slice(0, 200), tx.amount, tx.reference || null, tx.counterparty || null);
       }
 
       results.push({
@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
       params.push(clientId);
     }
     query += ' ORDER BY created_at DESC';
-    const docs = db.prepare(query).all(...params);
+    const docs = await db.prepare(query).all(...params);
     return NextResponse.json({ documents: docs });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -193,10 +193,10 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
     const tenantId = await getRequestTenant(request);
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
-    const doc = db.prepare('SELECT * FROM documents WHERE id = ? AND tenant_id = ?').get(id, tenantId) as any;
+    const doc = await db.prepare('SELECT * FROM documents WHERE id = ? AND tenant_id = ?').get(id, tenantId) as any;
     if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    db.prepare('DELETE FROM transactions WHERE source_document_id = ?').run(id);
-    db.prepare('DELETE FROM documents WHERE id = ?').run(id);
+    await db.prepare('DELETE FROM transactions WHERE source_document_id = ?').run(id);
+    await db.prepare('DELETE FROM documents WHERE id = ?').run(id);
     if (doc.storage_path) await unlink(doc.storage_path).catch(() => {});
     return NextResponse.json({ success: true });
   } catch (error: any) {

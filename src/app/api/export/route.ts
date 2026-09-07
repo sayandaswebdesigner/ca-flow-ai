@@ -70,22 +70,23 @@ export async function GET(request: NextRequest) {
     let clientName = 'All Clients';
 
     if (reconId) {
-      const recon = db.prepare('SELECT * FROM reconciliations WHERE id = ? AND tenant_id = ?').get(reconId, tenantId) as any;
+      const recon = await db.prepare('SELECT * FROM reconciliations WHERE id = ? AND tenant_id = ?').get(reconId, tenantId) as any;
       if (!recon) return NextResponse.json({ error: 'Reconciliation not found' }, { status: 404 });
       const ids = [...JSON.parse(recon.source_a_doc_ids || '[]'), ...JSON.parse(recon.source_b_doc_ids || '[]')];
       if (ids.length === 0) transactions = [];
       else
-        transactions = db
+        transactions = await db
           .prepare(`SELECT * FROM transactions WHERE tenant_id = ? AND source_document_id IN (${ids.map(() => '?').join(',')}) ORDER BY date`)
           .all(tenantId, ...ids) as any[];
-      clientName = db.prepare('SELECT name FROM clients WHERE id = ?').get(recon.client_id) as any ? (db.prepare('SELECT name FROM clients WHERE id = ?').get(recon.client_id) as any).name : clientName;
+      const clientResult = await db.prepare('SELECT name FROM clients WHERE id = ?').get(recon.client_id) as any;
+      clientName = clientResult ? clientResult.name : clientName;
     } else if (clientId) {
-      const c = db.prepare('SELECT name FROM clients WHERE id = ? AND tenant_id = ?').get(clientId, tenantId) as any;
+      const c = await db.prepare('SELECT name FROM clients WHERE id = ? AND tenant_id = ?').get(clientId, tenantId) as any;
       if (!c) return NextResponse.json({ error: 'Client not found' }, { status: 404 });
       clientName = c.name;
-      transactions = db.prepare('SELECT * FROM transactions WHERE tenant_id = ? AND client_id = ? ORDER BY date').all(tenantId, clientId) as any[];
+      transactions = await db.prepare('SELECT * FROM transactions WHERE tenant_id = ? AND client_id = ? ORDER BY date').all(tenantId, clientId) as any[];
     } else {
-      transactions = db.prepare('SELECT * FROM transactions WHERE tenant_id = ? ORDER BY date').all(tenantId) as any[];
+      transactions = await db.prepare('SELECT * FROM transactions WHERE tenant_id = ? ORDER BY date').all(tenantId) as any[];
     }
 
     if (format === 'tally' || format === 'xml') {
