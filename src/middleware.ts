@@ -22,12 +22,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Data APIs — allow anonymous with x-anonymous-tenant header (visits is global public)
+  // Data APIs — allow anonymous with x-anonymous-tenant header or tenantId query param
   if (pathname.startsWith('/api/')) {
     if (pathname.startsWith('/api/visits')) return NextResponse.next();
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     const anonTenant = request.headers.get('x-anonymous-tenant');
-    if (!token && !anonTenant) {
+    const queryTenant = request.nextUrl.searchParams.get('tenantId');
+    if (!token && !anonTenant && !queryTenant) {
       return NextResponse.json({ error: 'Unauthorized — please log in' }, { status: 401 });
     }
   }
