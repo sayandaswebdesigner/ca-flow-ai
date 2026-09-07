@@ -6,18 +6,16 @@ import { v4 as uuid } from 'uuid';
 export async function GET(request: NextRequest) {
   try {
     const db = await getDbAsync();
-    const { searchParams } = new URL(request.url);
-    const tenantId = await getRequestTenant(request);
-
-    const total = (await db.prepare('SELECT COUNT(*) as c FROM visits WHERE tenant_id = ?').get(tenantId) as any).c as number;
-    const unique = (await db.prepare('SELECT COUNT(DISTINCT ip) as c FROM visits WHERE tenant_id = ?').get(tenantId) as any).c as number;
-    const today = (await db.prepare("SELECT COUNT(*) as c FROM visits WHERE tenant_id = ? AND date(created_at) = date('now')").get(tenantId) as any).c as number;
+    // Global visits — all tenants (so Safari & Chrome show same)
+    const total = (await db.prepare('SELECT COUNT(*) as c FROM visits').get() as any).c as number;
+    const unique = (await db.prepare('SELECT COUNT(DISTINCT ip) as c FROM visits').get() as any).c as number;
+    const today = (await db.prepare("SELECT COUNT(*) as c FROM visits WHERE date(created_at) = date('now')").get() as any).c as number;
     const last7 = await db
       .prepare(
-        "SELECT date(created_at) as d, COUNT(*) as c FROM visits WHERE tenant_id = ? AND created_at >= datetime('now', '-7 days') GROUP BY date(created_at) ORDER BY d"
+        "SELECT date(created_at) as d, COUNT(*) as c FROM visits WHERE created_at >= datetime('now', '-7 days') GROUP BY date(created_at) ORDER BY d"
       )
-      .all(tenantId) as any[];
-    const recent = await db.prepare('SELECT * FROM visits WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 20').all(tenantId) as any[];
+      .all() as any[];
+    const recent = await db.prepare('SELECT * FROM visits ORDER BY created_at DESC LIMIT 20').all() as any[];
 
     return NextResponse.json({ total, unique, today, last7, recent });
   } catch (error: any) {
