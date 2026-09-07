@@ -13,8 +13,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://ca-flow-ai.vercel.app'),
   title: "CA-Flow AI - Reconciliation Platform",
-  description: "Automated CA reconciliation and document intake platform for Chartered Accountants",
+  description: "Automated CA reconciliation and document intake platform for Chartered Accountants. Upload bank + Tally, auto-match in seconds, GST-ready exports.",
+  keywords: ["CA", "Chartered Accountant", "reconciliation", "Tally", "GST", "bank reconciliation", "India"],
+  openGraph: {
+    title: "CA-Flow AI — Reconciliation OS for CAs",
+    description: "Auto-match bank + ledger, flag anomalies, export GST-ready. Free for CAs.",
+    url: "https://ca-flow-ai.vercel.app",
+    siteName: "CA-Flow AI",
+    type: "website",
+  },
+  twitter: { card: "summary_large_image", title: "CA-Flow AI", description: "Reconciliation OS for Chartered Accountants" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
