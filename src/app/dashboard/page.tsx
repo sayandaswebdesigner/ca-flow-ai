@@ -507,10 +507,7 @@ export default function CAFlowDashboard() {
   }
 
   function openReviewModalWithDraft(matched?: number, exceptions?: number) {
-    const draft =
-      matched != null
-        ? `CA-Flow matched ${matched} transactions in seconds and flagged ${exceptions ?? 0} exceptions with plain-English fixes. Saved 4+ hours vs Excel. Health score + WhatsApp chase is gold for our CA firm.`
-        : `CA-Flow makes bank reconciliation effortless — upload, auto-match, export to Tally. Clean UI and Smart Insights save hours every month.`;
+    const draft = '';
     setShowReviewModal({ open: true, rating: 5, text: draft, draft });
   }
 
