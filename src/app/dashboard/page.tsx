@@ -41,7 +41,7 @@ import {
 } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
-type View = 'dashboard' | 'documents' | 'transactions' | 'reconciliations' | 'clients' | 'insights' | 'reviews' | 'plugins' | 'assistant';
+type View = 'dashboard' | 'documents' | 'transactions' | 'reconciliations' | 'clients' | 'insights' | 'reviews' | 'plugins' | 'history';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview' },
@@ -51,8 +51,8 @@ const NAV_ITEMS = [
   { id: 'clients', label: 'Clients', icon: Users, desc: 'Manage' },
   { id: 'insights', label: 'Smart Insights', icon: ShieldAlert, desc: 'Anomaly radar' },
   { id: 'reviews', label: 'Reviews', icon: Sparkles, desc: 'Wall & capture' },
+  { id: 'history', label: 'History', icon: Activity, desc: 'Past records' },
   { id: 'plugins', label: 'Plugins', icon: Puzzle, desc: 'Integrations' },
-  { id: 'assistant', label: 'Assistant', icon: Bot, desc: 'AI chat' },
 ] as const;
 
 // ---------- helpers ----------
@@ -147,7 +147,7 @@ function UserMenu() {
 }
 
 // ==================== PLUGINS VIEW ====================
-function PluginsView() {
+function PluginsView({ onNavigate }: { onNavigate?: (view: View) => void }) {
   const [installed, setInstalled] = useState<Record<string, boolean>>(() => {
     if (typeof window === 'undefined') return {};
     try { return JSON.parse(localStorage.getItem('ca_plugins') || '{}'); } catch { return {}; }
@@ -165,60 +165,84 @@ function PluginsView() {
       name: 'Excel Import',
       desc: 'Import bank statements, ledgers, and reports from .xlsx/.xls files directly.',
       icon: Table2,
-      color: 'from-emerald-500 to-teal-600',
       bg: 'bg-emerald-50',
       border: 'border-emerald-200',
-      status: 'Built-in',
+      status: 'built-in' as const,
+      action: () => onNavigate?.('documents'),
+      actionLabel: 'Open Documents',
     },
     {
       id: 'tally',
       name: 'Tally Export',
       desc: 'Export reconciled transactions to Tally ERP XML format for direct import.',
       icon: FileSpreadsheet,
-      color: 'from-blue-500 to-indigo-600',
       bg: 'bg-blue-50',
       border: 'border-blue-200',
-      status: 'Built-in',
-    },
-    {
-      id: 'gmail',
-      name: 'Gmail Sync',
-      desc: 'Connect Gmail to auto-import bank statements and invoices from email attachments.',
-      icon: Mail,
-      color: 'from-red-500 to-rose-600',
-      bg: 'bg-red-50',
-      border: 'border-red-200',
-      status: 'Connect',
+      status: 'built-in' as const,
+      action: () => onNavigate?.('reconciliations'),
+      actionLabel: 'Open Reconciliations',
     },
     {
       id: 'whatsapp',
       name: 'WhatsApp Business',
       desc: 'Send reconciliation reminders and payment chase messages to clients via WhatsApp.',
       icon: MessageCircle,
-      color: 'from-green-500 to-emerald-600',
       bg: 'bg-green-50',
       border: 'border-green-200',
-      status: 'Built-in',
+      status: 'built-in' as const,
+      action: () => window.open('https://web.whatsapp.com/', '_blank'),
+      actionLabel: 'Open WhatsApp',
     },
     {
       id: 'gst',
-      name: 'GST Portal',
-      desc: 'Auto-fetch GSTR-1/GSTR-3B data and match with your books for GST reconciliation.',
+      name: 'GST Verification',
+      desc: 'Verify GSTIN numbers directly on the GST portal for client onboarding.',
       icon: Building2,
-      color: 'from-violet-500 to-purple-600',
       bg: 'bg-violet-50',
       border: 'border-violet-200',
-      status: 'Coming Soon',
+      status: 'built-in' as const,
+      action: () => window.open('https://services.gst.gov.in/services/searchtp', '_blank'),
+      actionLabel: 'Verify GSTIN',
+    },
+    {
+      id: 'pan',
+      name: 'PAN Verification',
+      desc: 'Verify PAN card details on the Income Tax portal for KYC compliance.',
+      icon: ShieldAlert,
+      bg: 'bg-amber-50',
+      border: 'border-amber-200',
+      status: 'built-in' as const,
+      action: () => window.open('https://www1.incometaxindiaefiling.gov.in/incomeefiling/ ValidatePan', '_blank'),
+      actionLabel: 'Verify PAN',
+    },
+    {
+      id: 'email',
+      name: 'Email Integration',
+      desc: 'Send reconciliation reports and invoices to clients via email.',
+      icon: Mail,
+      bg: 'bg-red-50',
+      border: 'border-red-200',
+      status: 'built-in' as const,
+      action: () => onNavigate?.('documents'),
+      actionLabel: 'Send Report',
+    },
+    {
+      id: 'gmail',
+      name: 'Gmail Sync',
+      desc: 'Connect Gmail to auto-import bank statements and invoices from email attachments.',
+      icon: Mail,
+      bg: 'bg-rose-50',
+      border: 'border-rose-200',
+      status: 'coming-soon' as const,
     },
     {
       id: 'cloud',
       name: 'Cloud Storage',
       desc: 'Sync documents with Google Drive, Dropbox, or OneDrive for automatic backup.',
       icon: CloudUpload,
-      color: 'from-cyan-500 to-blue-600',
       bg: 'bg-cyan-50',
       border: 'border-cyan-200',
-      status: 'Coming Soon',
+      status: 'coming-soon' as const,
     },
   ];
 
@@ -231,7 +255,7 @@ function PluginsView() {
             <Puzzle size={14} /> Plugin Marketplace
           </p>
           <h3 className="text-2xl font-semibold mt-3">Extend CA-Flow</h3>
-          <p className="text-indigo-100 text-sm mt-1 max-w-xl">Connect your existing tools — Gmail, Tally, WhatsApp, and more. One-click integrations.</p>
+          <p className="text-indigo-100 text-sm mt-1 max-w-xl">Connect your existing tools — GST, PAN, WhatsApp, and more. One-click integrations.</p>
         </div>
       </div>
 
@@ -248,22 +272,28 @@ function PluginsView() {
               </div>
             </div>
             <div className="mt-4 flex items-center gap-2">
-              {p.status === 'Built-in' ? (
-                <button
-                  onClick={() => togglePlugin(p.id)}
-                  className={cls(
-                    'flex-1 py-2 rounded-xl text-xs font-semibold transition-all',
-                    installed[p.id]
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                      : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm'
+              {p.status === 'built-in' ? (
+                <>
+                  <button
+                    onClick={() => togglePlugin(p.id)}
+                    className={cls(
+                      'flex-1 py-2 rounded-xl text-xs font-semibold transition-all',
+                      installed[p.id]
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                        : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm'
+                    )}
+                  >
+                    {installed[p.id] ? '✓ Installed' : 'Install'}
+                  </button>
+                  {p.action && installed[p.id] && (
+                    <button
+                      onClick={p.action}
+                      className="px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-all whitespace-nowrap"
+                    >
+                      {p.actionLabel} →
+                    </button>
                   )}
-                >
-                  {installed[p.id] ? '✓ Installed' : 'Install'}
-                </button>
-              ) : p.status === 'Connect' ? (
-                <button className="flex-1 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all">
-                  <Link2 size={14} className="inline mr-1" /> Connect
-                </button>
+                </>
               ) : (
                 <span className="flex-1 py-2 rounded-xl bg-slate-50 border border-slate-100 text-xs font-medium text-slate-400 text-center">
                   Coming Soon
@@ -381,6 +411,127 @@ function ChatbotView({ messages, input, setInput, onSend, loading, chatEndRef }:
   );
 }
 
+// ==================== HISTORY VIEW ====================
+function HistoryView({ transactions, reconciliations, clients }: { transactions: any[]; reconciliations: any[]; clients: any[] }) {
+  const [filter, setFilter] = useState<'all' | 'transactions' | 'reconciliations'>('all');
+  const [search, setSearch] = useState('');
+
+  const allRecords = useMemo(() => {
+    const records: { type: string; date: string; description: string; amount?: number; status: string; client?: string; id: string }[] = [];
+
+    if (filter === 'all' || filter === 'transactions') {
+      transactions.forEach((t) => {
+        records.push({
+          type: 'transaction',
+          date: t.date,
+          description: t.description || 'Transaction',
+          amount: t.amount,
+          status: t.status,
+          client: clients.find((c: any) => c.id === t.client_id)?.name,
+          id: t.id,
+        });
+      });
+    }
+
+    if (filter === 'all' || filter === 'reconciliations') {
+      reconciliations.forEach((r) => {
+        records.push({
+          type: 'reconciliation',
+          date: r.created_at,
+          description: r.name,
+          status: r.status,
+          client: clients.find((c: any) => c.id === r.client_id)?.name,
+          id: r.id,
+        });
+      });
+    }
+
+    records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    if (search) {
+      const q = search.toLowerCase();
+      return records.filter((r) =>
+        r.description.toLowerCase().includes(q) ||
+        (r.client || '').toLowerCase().includes(q) ||
+        r.status.toLowerCase().includes(q)
+      );
+    }
+
+    return records;
+  }, [transactions, reconciliations, clients, filter, search]);
+
+  const typeIcon = (type: string) => type === 'transaction' ? <ArrowLeftRight size={14} /> : <BarChart3 size={14} />;
+  const typeColor = (type: string) => type === 'transaction' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-violet-50 text-violet-700 border-violet-200';
+  const statusColor = (status: string) => {
+    if (status === 'matched' || status === 'completed') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+    if (status === 'unmatched' || status === 'draft') return 'bg-amber-50 text-amber-700 border-amber-100';
+    if (status === 'exception') return 'bg-red-50 text-red-700 border-red-100';
+    return 'bg-slate-50 text-slate-600 border-slate-200';
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <div>
+          <h3 className="text-xl font-semibold tracking-tight">History</h3>
+          <p className="text-sm text-slate-500">{allRecords.length} records • {transactions.length} transactions • {reconciliations.length} reconciliations</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+          {(['all', 'transactions', 'reconciliations'] as const).map((f) => (
+            <button key={f} onClick={() => setFilter(f)} className={cls('px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize', filter === f ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
+              {f}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1 max-w-xs">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search history…" className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-50" />
+        </div>
+      </div>
+
+      {allRecords.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
+            <Activity size={20} className="text-slate-400" />
+          </div>
+          <p className="font-medium mt-3">No history yet</p>
+          <p className="text-sm text-slate-500 mt-1">Upload documents and run reconciliations to see your history.</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="divide-y divide-slate-100">
+            {allRecords.map((r) => (
+              <div key={`${r.type}-${r.id}`} className="px-5 py-3.5 flex items-center gap-3 hover:bg-slate-50 transition-colors">
+                <div className={cls('w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0', typeColor(r.type))}>
+                  {typeIcon(r.type)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{r.description}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {r.client && <span>{r.client} • </span>}
+                    {new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+                {r.amount !== undefined && (
+                  <span className={cls('text-sm font-medium', r.amount >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+                    {r.amount >= 0 ? '+' : ''}₹{Math.abs(r.amount).toLocaleString('en-IN')}
+                  </span>
+                )}
+                <span className={cls('text-[11px] px-2 py-0.5 rounded-full border font-medium capitalize', statusColor(r.status))}>
+                  {r.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- page ----------
 export default function CAFlowDashboard() {
   const [view, setView] = useState<View>('dashboard');
@@ -405,6 +556,7 @@ export default function CAFlowDashboard() {
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'bot'; text: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [showChatWidget, setShowChatWidget] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   function notify(msg: string) {
@@ -598,6 +750,9 @@ export default function CAFlowDashboard() {
       } else if (lower.includes('show') && lower.includes('plugin')) {
         setView('plugins');
         response = 'Switched to Plugins view.';
+      } else if (lower.includes('show') && lower.includes('history')) {
+        setView('history');
+        response = 'Switched to History view.';
       } else if (lower.includes('create') && lower.includes('client')) {
         setShowClientModal(true);
         response = 'Opened the client creation form. Fill in the details and save.';
@@ -608,18 +763,35 @@ export default function CAFlowDashboard() {
         setView('reconciliations');
         response = 'Switched to Reconciliations. Select a reconciliation and click Run.';
       } else if (lower.includes('export') && lower.includes('excel')) {
-        response = 'Download your Excel export here: /api/export?format=excel';
+        const tenantId = typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '';
+        response = `Downloading Excel export...\n[a] Download Excel[/a]\nDirect link: /api/export?format=excel&tenantId=${encodeURIComponent(tenantId)}`;
+        // Trigger download
+        window.open(`/api/export?format=excel&tenantId=${encodeURIComponent(tenantId)}`, '_blank');
       } else if (lower.includes('export') && lower.includes('tally')) {
-        response = 'Download your Tally XML export here: /api/export?format=tally';
+        const tenantId = typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '';
+        response = `Downloading Tally XML export...\n[a] Download Tally XML[/a]\nDirect link: /api/export?format=tally&tenantId=${encodeURIComponent(tenantId)}`;
+        window.open(`/api/export?format=tally&tenantId=${encodeURIComponent(tenantId)}`, '_blank');
+      } else if (lower.includes('verify') && lower.includes('gst')) {
+        window.open('https://services.gst.gov.in/services/searchtp', '_blank');
+        response = 'Opening GST Portal for GSTIN verification. Enter the GSTIN number to verify.';
+      } else if (lower.includes('verify') && lower.includes('pan')) {
+        window.open('https://www1.incometaxindiaefiling.gov.in/incomeefiling/', '_blank');
+        response = 'Opening Income Tax portal for PAN verification.';
+      } else if (lower.includes('whatsapp') || lower.includes('send') && lower.includes('message')) {
+        window.open('https://web.whatsapp.com/', '_blank');
+        response = 'Opening WhatsApp Web. Go to Clients view to send messages to specific clients.';
+      } else if (lower.includes('send') && lower.includes('email')) {
+        setView('clients');
+        response = 'Switched to Clients view. Click the Email button on any client to send a message.';
       } else if (lower.includes('help') || lower.includes('what can you do')) {
-        response = `I can help you with:\n• "show transactions/clients/documents" — navigate views\n• "create client" — open client form\n• "upload documents" — go to upload\n• "run reconciliation" — go to reconciliations\n• "export excel/tally" — get export links\n• "show insights" — view Smart Insights\n• "show plugins" — view integrations\n• "stats" — show dashboard stats`;
+        response = `I can help you with:\n\n📊 Navigation:\n• "show transactions/clients/documents/reconciliations"\n• "show insights/reviews/plugins/history"\n\n🔧 Actions:\n• "create client" — open client form\n• "upload documents" — go to upload\n• "run reconciliation" — go to reconciliations\n• "export excel" / "export tally" — download data\n\n✅ Verification:\n• "verify gst" — open GST portal\n• "verify pan" — open PAN portal\n• "whatsapp" — open WhatsApp\n• "send email" — go to clients for email\n\n💡 Other:\n• "stats" — show dashboard stats\n• "help" — show this message`;
       } else if (lower.includes('stat') || lower.includes('overview')) {
         setView('dashboard');
         response = `Dashboard overview:\n• ${clients.length} clients\n• ${documents.length} documents\n• ${transactions.length} transactions\n• ${reconciliations.length} reconciliations\n• ${stats?.totalExceptions || 0} exceptions`;
       } else if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
-        response = 'Hello! I\'m your CA-Flow assistant. Ask me to show views, create clients, upload documents, or export data.';
+        response = 'Hello! I\'m your CA-Flow assistant. Ask me to show views, create clients, verify GST/PAN, send WhatsApp, or export data.';
       } else {
-        response = `I didn't understand "${msg}". Try:\n• "show transactions"\n• "create client"\n• "upload documents"\n• "export excel"\n• "help"`;
+        response = `I didn't understand "${msg}". Try:\n• "show transactions"\n• "create client"\n• "verify gst"\n• "export excel"\n• "help"`;
       }
     } catch (err) {
       response = 'Something went wrong. Please try again.';
@@ -755,33 +927,8 @@ export default function CAFlowDashboard() {
                 <span className="text-slate-400">• {visits?.unique ?? 0} unique</span>
                 <span className="text-slate-400">• today {visits?.today ?? 0}</span>
               </div>
-              {/* Genuine micro-review: header stars — no pulse, honest */}
-              <div className="hidden lg:flex items-center gap-1 pl-2 pr-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-sm">
-                <button
-                  onClick={() => setView('reviews')}
-                  className="text-xs font-medium text-slate-600 hover:text-slate-900 pr-2 border-r border-slate-200"
-                >
-                  {reviews?.stats?.count ? `${reviews.stats.avg.toFixed(1)}★ ${reviews.stats.count}` : 'Rate us'}
-                </button>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => {
-                      setHeaderRating(n);
-                      openReviewModalWithDraft();
-                      // pre-set rating in modal
-                      setTimeout(() => setShowReviewModal((s) => ({ ...s, rating: n })), 50);
-                    }}
-                    className="leading-none"
-                    aria-label={`Rate ${n} stars`}
-                    title="Write genuine review — 20 chars required"
-                  >
-                    <span className={n <= (headerRating || 0) ? 'text-amber-400' : 'text-slate-300 hover:text-amber-300'}>★</span>
-                  </button>
-                ))}
-              </div>
               <a
-                href="/api/export?format=excel"
+                href={`/api/export?format=excel&tenantId=${encodeURIComponent(typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '')}`}
                 onClick={() => setTimeout(() => openReviewModalWithDraft(), 1200)}
                 className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-medium"
               >
@@ -841,8 +988,8 @@ export default function CAFlowDashboard() {
               {view === 'clients' && <ClientsView clients={clients} onRefresh={loadAll} showModal={showClientModal} setShowModal={setShowClientModal} />}
               {view === 'insights' && <InsightsView insights={insights} />}
               {view === 'reviews' && <ReviewsView reviews={reviews} visits={visits} onSubmit={submitReview} onRefresh={loadAll} />}
-              {view === 'plugins' && <PluginsView />}
-              {view === 'assistant' && <ChatbotView messages={chatMessages} input={chatInput} setInput={setChatInput} onSend={handleChat} loading={chatLoading} chatEndRef={chatEndRef} />}
+              {view === 'plugins' && <PluginsView onNavigate={setView} />}
+              {view === 'history' && <HistoryView transactions={transactions} reconciliations={reconciliations} clients={clients} />}
             </>
           )}
         </main>
@@ -918,8 +1065,102 @@ export default function CAFlowDashboard() {
         </div>
       )}
 
+      {/* Floating AI Assistant Chat Widget */}
+      {showChatWidget && (
+        <div className="fixed bottom-20 right-6 z-50 w-[380px] max-w-[calc(100vw-3rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col" style={{ height: '500px' }}>
+          {/* Header */}
+          <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+              <Bot size={18} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-semibold text-sm">CA-Flow Assistant</p>
+              <p className="text-indigo-200 text-[11px]">Ask me anything</p>
+            </div>
+            <button onClick={() => setShowChatWidget(false)} className="p-1.5 rounded-lg hover:bg-white/20 text-white">
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-auto p-4 space-y-3">
+            {chatMessages.length === 0 && (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto">
+                  <Bot size={24} className="text-indigo-600" />
+                </div>
+                <p className="font-semibold mt-3 text-sm">How can I help?</p>
+                <p className="text-xs text-slate-500 mt-1">Try: "verify gst", "export excel", "show clients"</p>
+                <div className="mt-3 flex flex-wrap gap-1.5 justify-center">
+                  {['verify gst', 'verify pan', 'export excel', 'whatsapp', 'show clients'].map((s) => (
+                    <button key={s} onClick={() => setChatInput(s)} className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-[11px] font-medium text-slate-700 transition-colors">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {chatMessages.map((m, i) => (
+              <div key={i} className={cls('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                <div className={cls(
+                  'max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line',
+                  m.role === 'user'
+                    ? 'bg-indigo-600 text-white rounded-br-md'
+                    : 'bg-slate-100 text-slate-800 rounded-bl-md'
+                )}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {chatLoading && (
+              <div className="flex justify-start">
+                <div className="bg-slate-100 px-3 py-2.5 rounded-2xl rounded-bl-md">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-slate-200 p-3">
+            <div className="flex gap-2">
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleChat()}
+                placeholder="Type a command…"
+                className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-200"
+              />
+              <button
+                onClick={handleChat}
+                disabled={!chatInput.trim() || chatLoading}
+                className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition-colors shadow-sm"
+              >
+                <Send size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating AI Assistant FAB */}
+      <button
+        onClick={() => setShowChatWidget(!showChatWidget)}
+        className={cls(
+          'fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full shadow-lg hover:shadow-xl flex items-center justify-center hover:scale-105 transition-all',
+          showChatWidget ? 'bg-slate-900 text-white' : 'bg-indigo-600 text-white'
+        )}
+      >
+        {showChatWidget ? <X size={18} /> : <Bot size={18} />}
+      </button>
+
       {/* Floating review FAB — genuine, subtle */}
-      <button onClick={() => openReviewModalWithDraft()} className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-white border border-slate-200 text-slate-700 shadow-lg hover:shadow-xl flex items-center justify-center hover:scale-105 transition-transform">
+      <button onClick={() => openReviewModalWithDraft()} className="fixed bottom-6 right-20 z-40 w-12 h-12 rounded-full bg-white border border-slate-200 text-slate-700 shadow-lg hover:shadow-xl flex items-center justify-center hover:scale-105 transition-transform">
         <Sparkles size={18} className="text-indigo-600" />
       </button>
     </div>
@@ -1603,9 +1844,19 @@ function ReconciliationsView({ reconciliations, documents, clients, onRun, onRef
                 </div>
                 <div className="flex items-center gap-2">
                   {r.status === 'draft' && (
-                    <button onClick={() => onRun(r.id)} className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium">
-                      Run matching
-                    </button>
+                    <>
+                      <button onClick={() => onRun(r.id)} className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium">
+                        Run matching
+                      </button>
+                      <a href={`/api/export?format=excel&reconciliationId=${r.id}&tenantId=${encodeURIComponent(typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '')}`}
+                         className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm">
+                        Excel
+                      </a>
+                      <a href={`/api/export?format=tally&reconciliationId=${r.id}&tenantId=${encodeURIComponent(typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '')}`}
+                         className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm">
+                        Tally
+                      </a>
+                    </>
                   )}
                   {r.status === 'completed' && (
                     <>
@@ -1613,10 +1864,12 @@ function ReconciliationsView({ reconciliations, documents, clients, onRun, onRef
                         <p className="text-emerald-600 font-medium">{r.matched_count} matched</p>
                         <p className="text-amber-600">{r.exception_count} exceptions</p>
                       </div>
-                      <a href={`/api/export?format=excel&reconciliationId=${r.id}`} className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm">
+                      <a href={`/api/export?format=excel&reconciliationId=${r.id}&tenantId=${encodeURIComponent(typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '')}`}
+                         className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm">
                         Excel
                       </a>
-                      <a href={`/api/export?format=tally&reconciliationId=${r.id}`} className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm">
+                      <a href={`/api/export?format=tally&reconciliationId=${r.id}&tenantId=${encodeURIComponent(typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '')}`}
+                         className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm">
                         Tally
                       </a>
                     </>
@@ -1781,10 +2034,25 @@ function ClientsView({ clients, onRefresh, showModal, setShowModal }: any) {
                     <MessageCircle size={12} /> WhatsApp
                   </a>
                 )}
-                <a href={`/api/export?format=excel&clientId=${c.id}`} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50">
+                {c.gstin && (
+                  <a href={`https://services.gst.gov.in/services/searchtp`} target="_blank" className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-violet-600 hover:bg-violet-500 text-white font-medium">
+                    <Building2 size={12} /> Verify GST
+                  </a>
+                )}
+                {c.pan && (
+                  <a href={`https://www1.incometaxindiaefiling.gov.in/incomeefiling/`} target="_blank" className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-amber-600 hover:bg-amber-500 text-white font-medium">
+                    <ShieldAlert size={12} /> Verify PAN
+                  </a>
+                )}
+                {c.email && (
+                  <a href={`mailto:${c.email}?subject=${encodeURIComponent('CA-Flow: Pending Documents Request')}&body=${encodeURIComponent(`Dear ${c.name},\n\nPlease share the pending documents for reconciliation.\n\nRegards,\nCA Team`)}`} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 font-medium">
+                    <Mail size={12} /> Email
+                  </a>
+                )}
+                <a href={`/api/export?format=excel&clientId=${c.id}&tenantId=${encodeURIComponent(typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '')}`} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50">
                   <FileSpreadsheet size={12} /> Excel
                 </a>
-                <a href={`/api/export?format=tally&clientId=${c.id}`} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white">
+                <a href={`/api/export?format=tally&clientId=${c.id}&tenantId=${encodeURIComponent(typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '')}`} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white">
                   <Download size={12} /> Tally
                 </a>
               </div>

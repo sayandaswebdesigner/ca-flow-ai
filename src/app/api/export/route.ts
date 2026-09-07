@@ -61,7 +61,10 @@ export async function GET(request: NextRequest) {
   try {
     const db = await getDbAsync();
     const { searchParams } = new URL(request.url);
-    const tenantId = await getRequestTenant(request);
+    // Accept tenantId from query param (for <a> tag links that can't send headers)
+    const queryTenant = searchParams.get('tenantId');
+    const sessionTenant = await getRequestTenant(request);
+    const tenantId = (queryTenant && queryTenant.trim()) || sessionTenant;
     const clientId = searchParams.get('clientId');
     const format = (searchParams.get('format') || 'excel').toLowerCase(); // excel | tally
     const reconId = searchParams.get('reconciliationId');
