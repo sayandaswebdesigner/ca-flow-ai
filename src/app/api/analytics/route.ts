@@ -26,12 +26,19 @@ export async function GET(request: NextRequest) {
       )
       .all() as any[];
 
-    // Hourly today
-    const hourly = await db
-      .prepare(
-        `SELECT strftime('%H', created_at) as h, COUNT(*) as c FROM visits WHERE date(created_at) = date('now') GROUP BY h ORDER BY h`
-      )
-      .all() as any[];
+    // Hourly today — PG vs SQLite (strftime only exists on SQLite)
+    const isPG = !!process.env.DATABASE_URL;
+    const hourly = isPG
+      ? await db
+          .prepare(
+            `SELECT EXTRACT(HOUR FROM created_at::timestamptz)::text as h, COUNT(*) as c FROM visits WHERE DATE(created_at::timestamptz) = CURRENT_DATE GROUP BY h ORDER BY h`
+          )
+          .all() as any[]
+      : await db
+          .prepare(
+            `SELECT strftime('%H', created_at) as h, COUNT(*) as c FROM visits WHERE date(created_at) = date('now') GROUP BY h ORDER BY h`
+          )
+          .all() as any[];
 
     // Top paths
     const topPaths = await db
