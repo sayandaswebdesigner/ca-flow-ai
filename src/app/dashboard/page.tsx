@@ -443,12 +443,17 @@ export default function CAFlowDashboard() {
       setClients(clientsData.clients || []);
       setInsights(insightsData.error ? null : insightsData);
       setReviews(reviewsData.error ? null : reviewsData);
-      setVisits(visitsData.error ? null : visitsData);
+      // visits can fail on pg text cast — fallback to zeros
+      if (visitsData.error) {
+        console.warn('visits error', visitsData.error);
+        setVisits({ total: 0, unique: 0, today: 0, last7: [], recent: [] });
+      } else setVisits(visitsData);
     } catch (e) {
       console.error(e);
       notify('Failed to load data');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   // auto-log visit once per mount + detect login state

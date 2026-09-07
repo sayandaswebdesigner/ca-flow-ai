@@ -63,9 +63,11 @@ function convertPlaceholders(sql: string): string {
   result = result.replace(/datetime\('now',\s*'-(\d+)\s*days?'\)/gi, "NOW() - INTERVAL '$1 days'");
   result = result.replace(/datetime\('now',\s*'-(\d+)\s*hours?'\)/gi, "NOW() - INTERVAL '$1 hours'");
   result = result.replace(/datetime\('now'\)/gi, 'NOW()');
-  // date('now') -> CURRENT_DATE, date(col) -> DATE(col)
+  // date('now') -> CURRENT_DATE, date(col) -> DATE(col) with cast for TEXT columns
   result = result.replace(/date\('now'\)/gi, 'CURRENT_DATE');
-  result = result.replace(/\bdate\s*\(\s*created_at\s*\)/gi, 'DATE(created_at)');
+  result = result.replace(/\bdate\s*\(\s*created_at\s*\)/gi, 'DATE(created_at::timestamptz)');
+  // created_at >= datetime(...) -> created_at::timestamptz >= ...
+  result = result.replace(/created_at\s*>=\s*NOW\(\)/gi, 'created_at::timestamptz >= NOW()');
   result = result.replace(/AUTOINCREMENT/g, '');
   return result;
 }
