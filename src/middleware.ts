@@ -5,6 +5,11 @@ const SESSION_COOKIE = 'ca_session';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Root -> dashboard redirect (fix RSC blank)
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/dashboard', request.url), 307);
+  }
+
   // Public routes — always accessible
   if (
     pathname.startsWith('/login') ||
@@ -34,5 +39,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login', '/signup', '/api/:path*'],
+  matcher: ['/', '/dashboard/:path*', '/login', '/signup', '/api/:path*'],
 };
