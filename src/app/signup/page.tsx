@@ -58,7 +58,7 @@ function SignupForm() {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white text-indigo-700 flex items-center justify-center font-bold text-sm shadow-md">CF</div>
             <div>
-              <p className="font-semibold text-lg tracking-tight">CA-Flow</p>
+              <p className="font-semibold text-lg tracking-tight">LedgerFlow</p>
               <p className="text-xs text-indigo-100">Reconciliation OS</p>
             </div>
           </div>
@@ -75,7 +75,7 @@ function SignupForm() {
             <p>✓ No demo data — your real books only</p>
           </div>
         </div>
-        <p className="relative text-xs text-indigo-200">CA-Flow AI • Secure • India-hosted</p>
+        <p className="relative text-xs text-indigo-200">LedgerFlow • Secure • India-hosted</p>
       </div>
 
       {/* Right — form */}

@@ -6,9 +6,9 @@ export default function Home() {
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-sm shadow-md">CF</div>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-sm shadow-md">LF</div>
             <div>
-              <p className="font-semibold text-[15px] tracking-tight leading-none">CA-Flow</p>
+              <p className="font-semibold text-[15px] tracking-tight leading-none">LedgerFlow</p>
               <p className="text-[11px] text-slate-500">Reconciliation OS</p>
             </div>
           </div>
@@ -20,7 +20,7 @@ export default function Home() {
           <div>
             <p className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-medium">✓ India-hosted • Secure • Audit-ready</p>
             <h1 className="text-4xl lg:text-5xl font-semibold tracking-tight mt-4 leading-tight">Reconciliation,<br /><span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">perfected.</span></h1>
-            <p className="text-slate-600 mt-4 max-w-xl">Upload bank + Tally/Excel, auto-match in seconds, flag anomalies, export audit-ready. Built for Chartered Accountants.</p>
+            <p className="text-slate-600 mt-4 max-w-xl">Upload bank + Tally/Excel, auto-match in seconds, flag anomalies, export audit-ready. Built for Finance Teams, CAs & Accountants — free to start.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href="/dashboard" className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg">Go to Dashboard →</Link>
               <Link href="/dashboard" className="px-6 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 font-medium">View Demo</Link>
@@ -53,7 +53,7 @@ export default function Home() {
           </div>
         ))}
       </section>
-      <footer className="border-t border-slate-200 py-8 text-center text-xs text-slate-400">CA-Flow AI • Secure • India-hosted • <Link href="/dashboard" className="underline">Dashboard</Link></footer>
+      <footer className="border-t border-slate-200 py-8 text-center text-xs text-slate-400">LedgerFlow • Secure • India-hosted • <Link href="/dashboard" className="underline">Dashboard</Link></footer>
     </div>
   );
 }

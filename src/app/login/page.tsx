@@ -47,7 +47,7 @@ function LoginForm() {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white text-indigo-700 flex items-center justify-center font-bold text-sm shadow-md">CF</div>
             <div>
-              <p className="font-semibold text-lg tracking-tight">CA-Flow</p>
+              <p className="font-semibold text-lg tracking-tight">LedgerFlow</p>
               <p className="text-xs text-indigo-100">Reconciliation OS</p>
             </div>
           </div>
@@ -64,7 +64,7 @@ function LoginForm() {
             <span>✓ Tally + Excel</span>
           </div>
         </div>
-        <p className="relative text-xs text-indigo-200">CA-Flow AI • Trusted reconciliation workspace</p>
+        <p className="relative text-xs text-indigo-200">LedgerFlow • Trusted reconciliation workspace</p>
       </div>
 
       {/* Right — form */}
@@ -105,7 +105,7 @@ function LoginForm() {
             </button>
           </form>
           <p className="text-sm text-slate-500 mt-6 text-center">
-            New to CA-Flow?{' '}
+            New to LedgerFlow?{' '}
             <Link href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-500">
               Create account
             </Link>

@@ -174,7 +174,7 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     bg: 'bg-violet-50',
     border: 'border-violet-200',
     category: 'Tax & Compliance',
-    author: 'CA-Flow',
+    author: 'LedgerFlow',
     version: '1.2',
     tools: ['verify_gst'],
   },
@@ -187,7 +187,7 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     bg: 'bg-amber-50',
     border: 'border-amber-200',
     category: 'Tax & Compliance',
-    author: 'CA-Flow',
+    author: 'LedgerFlow',
     version: '1.2',
     tools: ['verify_pan'],
   },
@@ -200,7 +200,7 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     bg: 'bg-green-50',
     border: 'border-green-200',
     category: 'Communication',
-    author: 'CA-Flow',
+    author: 'LedgerFlow',
     version: '1.4',
     tools: ['send_whatsapp', 'whatsapp_intake'],
   },
@@ -213,7 +213,7 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     bg: 'bg-red-50',
     border: 'border-red-200',
     category: 'Communication',
-    author: 'CA-Flow',
+    author: 'LedgerFlow',
     version: '1.1',
     tools: ['send_email'],
   },
@@ -226,7 +226,7 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     bg: 'bg-emerald-50',
     border: 'border-emerald-200',
     category: 'Import/Export',
-    author: 'CA-Flow',
+    author: 'LedgerFlow',
     version: '1.3',
     tools: ['import_excel'],
   },
@@ -239,7 +239,7 @@ const PLUGIN_REGISTRY: PluginDef[] = [
     bg: 'bg-blue-50',
     border: 'border-blue-200',
     category: 'Import/Export',
-    author: 'CA-Flow',
+    author: 'LedgerFlow',
     version: '1.3',
     tools: ['export_tally', 'export_excel'],
   },
@@ -1033,12 +1033,12 @@ export default function CAFlowDashboard() {
         }
       } else if (lower.includes('help') || lower.includes('what can you do')) {
         const on = PLUGIN_REGISTRY.filter((p) => isPluginEnabled(p.id)).map((p) => p.name).join(', ');
-        response = `I'm the CA-Flow assistant. I call plugins like ChatGPT/Claude do.\n\nEnabled plugins: ${on || 'none — enable in Plugin Store'}\n\nTry:\n• "verify gst 27AAPFU0939F1ZV" → GST plugin tool-call\n• "verify pan AABCU1234F" → PAN plugin tool-call\n• "whatsapp Sharma Enterprises please share Oct statement" → WhatsApp plugin\n• "export excel" / "export tally" → Import/Export plugins\n• "import excel" → open Documents\n• "show plugins" → open Plugin Store\n\nDisabled plugins are blocked with an “enable first” card — exactly like ChatGPT.`;
+        response = `I'm the LedgerFlow assistant. I call plugins like ChatGPT/Claude do.\n\nEnabled plugins: ${on || 'none — enable in Plugin Store'}\n\nTry:\n• "verify gst 27AAPFU0939F1ZV" → GST plugin tool-call\n• "verify pan AABCU1234F" → PAN plugin tool-call\n• "whatsapp Sharma Enterprises please share Oct statement" → WhatsApp plugin\n• "export excel" / "export tally" → Import/Export plugins\n• "import excel" → open Documents\n• "show plugins" → open Plugin Store\n\nDisabled plugins are blocked with an “enable first” card — exactly like ChatGPT.`;
       } else if (lower.includes('stat') || lower.includes('overview')) {
         setView('dashboard');
         response = `Dashboard overview:\n• ${clients.length} clients\n• ${documents.length} documents\n• ${transactions.length} transactions\n• ${reconciliations.length} reconciliations\n• ${stats?.totalExceptions || 0} exceptions`;
       } else if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
-        response = 'Hello! I\'m your CA-Flow assistant. I call plugins like ChatGPT/Claude — enable them in the Plugin Store and ask, e.g. “verify gst 27AAPFU0939F1ZV”.';
+        response = 'Hello! I\'m your LedgerFlow assistant. I call plugins like ChatGPT/Claude — enable them in the Plugin Store and ask, e.g. “verify gst 27AAPFU0939F1ZV”.';
       } else {
         response = `I didn't understand "${msg}".\nTry (plugins auto-invoke):\n• "verify gst 27AAPFU0939F1ZV"\n• "verify pan AABCU1234F"\n• "whatsapp <client> <message>"\n• "export excel" / "export tally"\n• "show plugins" to manage plugins`;
       }
@@ -1088,9 +1088,9 @@ export default function CAFlowDashboard() {
       {/* Sidebar */}
       <aside className="hidden lg:flex w-[286px] bg-white/80 glass border-r border-slate-200 flex-col sticky top-0 h-screen">
         <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-[13px] shadow-md">CF</div>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-[13px] shadow-md">LF</div>
           <div className="min-w-0">
-            <h1 className="font-semibold text-[15px] tracking-tight leading-none">CA-Flow</h1>
+            <h1 className="font-semibold text-[15px] tracking-tight leading-none">LedgerFlow</h1>
             <p className="text-[11px] text-slate-500 mt-0.5">Reconciliation OS</p>
           </div>
           <span className="ml-auto text-[10px] px-2 py-1 rounded-full bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-700 border border-indigo-100 font-medium">PRO</span>
@@ -1138,7 +1138,7 @@ export default function CAFlowDashboard() {
               </button>
             </div>
           </div>
-          <p className="text-[11px] text-slate-400 text-center mt-3">CA-Flow AI • Secure • India-hosted</p>
+          <p className="text-[11px] text-slate-400 text-center mt-3">LedgerFlow • Secure • India-hosted</p>
         </div>
       </aside>
 
@@ -1323,7 +1323,7 @@ export default function CAFlowDashboard() {
               <Bot size={18} className="text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-white font-semibold text-sm">CA-Flow Assistant</p>
+              <p className="text-white font-semibold text-sm">LedgerFlow Assistant</p>
               <p className="text-indigo-200 text-[11px]">Ask me anything</p>
             </div>
             <button onClick={() => setShowChatWidget(false)} className="p-1.5 rounded-lg hover:bg-white/20 text-white">
@@ -2225,7 +2225,7 @@ function ClientEmailSend({ email, name }: { email: string; name: string }) {
       const ah = getAnonHeaders() as Record<string, string>;
       const r = await fetch('/api/email/send', {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...ah },
-        body: JSON.stringify({ to: email, subject: 'CA-Flow: Pending Documents Request', body: `Dear ${name},\n\nPlease share the pending documents for reconciliation.\n\nRegards,\nCA Team` }),
+        body: JSON.stringify({ to: email, subject: 'LedgerFlow: Pending Documents Request', body: `Dear ${name},\n\nPlease share the pending documents for reconciliation.\n\nRegards,\nCA Team` }),
       });
       const d = await r.json();
       if (!r.ok) { alert(d.error || 'Compose failed'); return; }
@@ -2636,8 +2636,8 @@ function ReviewsView({ reviews, visits, onSubmit, onRefresh }: any) {
     }
   }
 
-  const waShare = `https://wa.me/?text=${encodeURIComponent(`Check CA-Flow — ${avg.toFixed(1)}★ from ${count} CAs — ` + (typeof window !== 'undefined' ? window.location.href : ''))}`;
-  const googleLink = 'https://g.page/r/CA-Flow/review'; // replace with your Google Business link
+  const waShare = `https://wa.me/?text=${encodeURIComponent(`Check LedgerFlow — ${avg.toFixed(1)}★ from ${count} CAs — ` + (typeof window !== 'undefined' ? window.location.href : ''))}`;
+  const googleLink = 'https://g.page/r/LedgerFlow/review'; // replace with your Google Business link
 
   return (
     <div className="space-y-6">
@@ -2648,7 +2648,7 @@ function ReviewsView({ reviews, visits, onSubmit, onRefresh }: any) {
           <div className="flex-1 min-w-[240px]">
             <p className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/15 border border-white/20 font-medium">✓ Genuine reviews — verified only</p>
             <h3 className="text-2xl font-semibold mt-3">Reviews — Wall of Trust</h3>
-            <p className="text-indigo-100 text-sm mt-1 max-w-xl">Honest, verified feedback from CAs who actually used CA-Flow. We publish 1-5★ as-is — no incentive for rating value.</p>
+            <p className="text-indigo-100 text-sm mt-1 max-w-xl">Honest, verified feedback from CAs who actually used LedgerFlow. We publish 1-5★ as-is — no incentive for rating value.</p>
             <div className="mt-3 inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/15 border border-white/20">
               <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
               {visits ? `${visits.total} visits • ${visits.unique} unique • ${visits.today} today` : 'loading visits…'} • <a href={typeof window !== 'undefined' ? window.location.href : '#'} target="_blank" className="underline">public link</a>

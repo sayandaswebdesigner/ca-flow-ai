@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const to = String(body.to || '').trim();
-    const subject = String(body.subject || 'CA-Flow: Pending Documents Request').slice(0, 200);
+    const subject = String(body.subject || 'LedgerFlow: Pending Documents Request').slice(0, 200);
     const text = String(body.body || body.text || '').slice(0, 5000).trim();
     if (!EMAIL_RE.test(to)) return NextResponse.json({ error: 'Valid client email required' }, { status: 400 });
     if (!text) return NextResponse.json({ error: 'Email body required' }, { status: 400 });
