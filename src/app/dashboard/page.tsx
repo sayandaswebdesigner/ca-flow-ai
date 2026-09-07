@@ -1133,6 +1133,10 @@ export default function CAFlowDashboard() {
       } else if (lower.includes('show') && lower.includes('history')) {
         setView('history');
         response = 'Switched to History view.';
+      } else if (lower.includes('show') && lower.includes('analytics') || lower === 'analytics' || lower.includes('open analytics')) {
+        trackEvent('view', 'analytics');
+        window.open('/analytics', '_blank');
+        response = 'Opening Analytics in a new tab — live visits, tab usage & plugin stats, separate from dashboard.';
       } else if (lower.includes('create') && lower.includes('client')) {
         setShowClientModal(true);
         response = 'Opened the client creation form. Fill in the details and save.';
@@ -1315,10 +1319,16 @@ export default function CAFlowDashboard() {
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-auto">
           {NAV_ITEMS.map((item) => {
             const active = view === item.id;
+            const isAnalytics = item.id === 'analytics';
             return (
               <button
                 key={item.id}
-                onClick={() => setView(item.id as View)}
+                onClick={() => {
+                  if (isAnalytics) {
+                    trackEvent('view', 'analytics');
+                    window.open('/analytics', '_blank');
+                  } else setView(item.id as View);
+                }}
                 className={cls(
                   'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left relative',
                   active
@@ -1329,9 +1339,10 @@ export default function CAFlowDashboard() {
                 <item.icon size={18} className={cls(active ? 'text-white' : 'text-slate-500')} />
                 <span className="flex-1 min-w-0">
                   <span className={cls('block leading-none', active ? 'font-medium' : 'font-medium')}>{item.label}</span>
-                  <span className={cls('block text-[11px] leading-none mt-1', active ? 'text-indigo-100' : 'text-slate-400')}>{item.desc}</span>
+                  <span className={cls('block text-[11px] leading-none mt-1', active ? 'text-indigo-100' : 'text-slate-400')}>{item.desc} {isAnalytics && '↗'}</span>
                 </span>
-                {active && <ChevronRight size={14} className="text-indigo-200" />}
+                {active && !isAnalytics && <ChevronRight size={14} className="text-indigo-200" />}
+                {isAnalytics && <ExternalLink size={12} className="text-slate-400" />}
               </button>
             );
           })}
@@ -1414,13 +1425,18 @@ export default function CAFlowDashboard() {
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setView(item.id as View)}
+                onClick={() => {
+                  if (item.id === 'analytics') {
+                    trackEvent('view', 'analytics');
+                    window.open('/analytics', '_blank');
+                  } else setView(item.id as View);
+                }}
                 className={cls(
                   'flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap border',
                   view === item.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'
                 )}
               >
-                <item.icon size={14} /> {item.label}
+                <item.icon size={14} /> {item.label} {item.id === 'analytics' && '↗'}
               </button>
             ))}
           </div>

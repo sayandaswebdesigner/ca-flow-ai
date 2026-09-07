@@ -17,8 +17,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Dashboard — fully public (anonymous users allowed)
-  if (pathname.startsWith('/dashboard')) {
+  // Dashboard + Analytics — fully public (anonymous users allowed)
+  if (pathname.startsWith('/dashboard') || pathname.startsWith('/analytics')) {
     return NextResponse.next();
   }
 
