@@ -32,10 +32,11 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await sendVerificationEmail(raw, code);
-    if (!result.sent) return NextResponse.json({ error: result.error || 'Failed to send email' }, { status: 500 });
+    if (!result.sent) return NextResponse.json({ error: result.error || 'Failed to send email — check inbox provider or try again' }, { status: 500 });
 
-    // In mock mode (no RESEND_API_KEY), return code so dev/local can test without email infra — never in prod with key set
-    return NextResponse.json({ sent: true, mocked: result.mocked, ...(result.mocked ? { devCode: code } : {}) });
+    // Professional: NEVER leak code in same-tab response — code must be read from email inbox (Gmail/Apple Mail)
+    // Mocked in dev still requires reading server logs, not client response
+    return NextResponse.json({ sent: true, mocked: result.mocked });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

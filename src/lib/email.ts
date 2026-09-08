@@ -1,9 +1,14 @@
-// Free email sender — Resend if RESEND_API_KEY exists, else mock (logs + returns code in dev)
+// Professional email sender — Resend required in production, no code leak to client
 export async function sendVerificationEmail(email: string, code: string): Promise<{ sent: boolean; mocked: boolean; error?: string }> {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || 'LedgerFlow <onboarding@resend.dev>';
   if (!key) {
-    console.log(`[email:mock] Verification code for ${email}: ${code}`);
+    // In production NEVER mock — require real inbox. In dev we log server-side but still fail the client so code is NOT returned in same tab.
+    console.log(`[email:mock] Verification code for ${email}: ${code} (RESEND_API_KEY missing — code NOT sent to inbox)`);
+    if (process.env.NODE_ENV === 'production') {
+      return { sent: false, mocked: false, error: 'Email service not configured — contact support (RESEND_API_KEY missing)' };
+    }
+    // Dev fallback: pretend sent but do NOT expose code to client (professional — code must come from email client)
     return { sent: true, mocked: true };
   }
   try {

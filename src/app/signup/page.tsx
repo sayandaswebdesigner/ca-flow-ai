@@ -24,7 +24,6 @@ function SignupForm() {
   const [sendingCode, setSendingCode] = useState(false);
   const [verified, setVerified] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [devCode, setDevCode] = useState<string | null>(null);
 
   // Live genuine-email check (free, debounced)
   useEffect(() => {
@@ -49,9 +48,8 @@ function SignupForm() {
     try {
       const r = await fetch('/api/auth/send-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim() }) });
       const d = await r.json();
-      if (!r.ok) { setError(d.error || 'Failed to send code'); return; }
+      if (!r.ok) { setError(d.error || 'Failed to send code — check email or try different provider'); return; }
       setCodeSent(true);
-      setDevCode(d.devCode || null);
     } finally { setSendingCode(false); }
   }
 
@@ -153,7 +151,7 @@ function SignupForm() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => { setEmail(e.target.value); setVerified(false); setCodeSent(false); setDevCode(null); }}
+                onChange={(e) => { setEmail(e.target.value); setVerified(false); setCodeSent(false); }}
                 placeholder="you@firm.in"
                 autoComplete="email"
                 className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-4 ${emailCheck ? (emailCheck.genuine ? 'border-emerald-200 focus:ring-emerald-50 focus:border-emerald-300' : 'border-red-200 focus:ring-red-50 focus:border-red-300') : 'border-slate-200 focus:ring-indigo-50 focus:border-indigo-300'}`}
@@ -177,14 +175,16 @@ function SignupForm() {
                 </div>
               )}
               {codeSent && !verified && (
-                <div className="mt-2 flex gap-2">
-                  <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Enter 6-digit code" maxLength={6} className="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm tracking-widest focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300" />
-                  <button type="button" onClick={verify} disabled={verifying} className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium disabled:opacity-50">
-                    {verifying ? 'Verifying…' : 'Verify'}
-                  </button>
-                </div>
+                <>
+                  <div className="mt-2 flex gap-2">
+                    <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Enter 6-digit code from email" maxLength={6} className="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm tracking-widest focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300" />
+                    <button type="button" onClick={verify} disabled={verifying} className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium disabled:opacity-50">
+                      {verifying ? 'Verifying…' : 'Verify'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">Check your inbox (Gmail / Apple Mail) — code expires in 10 min. Don’t see it? Check Spam.</p>
+                </>
               )}
-              {devCode && !verified && <p className="text-xs text-amber-600 mt-1">Dev mode (no RESEND_API_KEY): code is <span className="font-mono font-bold">{devCode}</span> — free mock</p>}
               {verified && <p className="text-xs text-emerald-600 mt-1.5">✓ Email verified — you can now create your account</p>}
             </label>
             <div className="grid grid-cols-2 gap-4">
