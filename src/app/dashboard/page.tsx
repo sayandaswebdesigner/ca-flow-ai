@@ -1352,18 +1352,25 @@ export default function CAFlowDashboard() {
               </button>
             );
           })}
-          {isAdmin && ADMIN_NAV_ITEMS.map((item) => (
+          {ADMIN_NAV_ITEMS.map((item) => (
             <button
               key={item.id}
-              onClick={() => window.open('/analytics', '_blank')}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-amber-700 hover:bg-amber-50 border border-amber-100 text-left"
+              onClick={() => {
+                if (!isAdmin) {
+                  notify('Analytics is owner-only — please log in as owner (sayandaswebdesigner@gmail.com)');
+                  setTimeout(() => window.open('/analytics', '_blank'), 800);
+                  return;
+                }
+                window.open('/analytics', '_blank');
+              }}
+              className={cls('w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left border', isAdmin ? 'text-amber-700 hover:bg-amber-50 border-amber-100' : 'text-slate-500 hover:bg-slate-50 border-slate-200 opacity-90')}
             >
-              <item.icon size={18} className="text-amber-600" />
+              <item.icon size={18} className={isAdmin ? 'text-amber-600' : 'text-slate-400'} />
               <span className="flex-1 min-w-0">
-                <span className="block leading-none font-medium">{item.label}</span>
-                <span className="block text-[11px] leading-none mt-1 text-amber-600/70">{item.desc} ↗</span>
+                <span className="block leading-none font-medium flex items-center gap-1.5">{item.label} {!isAdmin && <span className="px-1.5 py-0.5 rounded-full bg-slate-900 text-white text-[10px]">🔒 Owner</span>}</span>
+                <span className={cls('block text-[11px] leading-none mt-1', isAdmin ? 'text-amber-600/70' : 'text-slate-400')}>{isAdmin ? `${item.desc} ↗` : 'Login as owner to view ↗'}</span>
               </span>
-              <ExternalLink size={12} className="text-amber-400" />
+              <ExternalLink size={12} className={isAdmin ? 'text-amber-400' : 'text-slate-300'} />
             </button>
           ))}
         </nav>
@@ -1441,18 +1448,20 @@ export default function CAFlowDashboard() {
 
           {/* Mobile nav */}
           <div className="lg:hidden px-2 pb-3 flex gap-1.5 overflow-auto">
-            {[...NAV_ITEMS, ...(isAdmin ? [...ADMIN_NAV_ITEMS] : [])].map((item) => {
+            {[...NAV_ITEMS, ...ADMIN_NAV_ITEMS].map((item) => {
               const admin = (ADMIN_NAV_ITEMS as any).some((a: any) => a.id === item.id);
               return (
                 <button
                   key={item.id}
                   onClick={() => {
-                    if (admin) window.open('/analytics', '_blank');
-                    else setView(item.id as View);
+                    if (admin) {
+                      if (!isAdmin) { notify('Analytics is owner-only — log in as owner'); setTimeout(() => window.open('/analytics', '_blank'), 600); return; }
+                      window.open('/analytics', '_blank');
+                    } else setView(item.id as View);
                   }}
                   className={cls(
                     'flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap border',
-                    admin ? 'bg-amber-50 text-amber-700 border-amber-200' : view === item.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'
+                    admin ? (isAdmin ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-500 border-slate-200') : view === item.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'
                   )}
                 >
                   <item.icon size={14} /> {item.label} {admin && '↗'}
