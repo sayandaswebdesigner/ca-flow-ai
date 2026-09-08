@@ -31,6 +31,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.15.13",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^9.6.0",
     "@types/multer": "^2.2.0",
