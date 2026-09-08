@@ -28,6 +28,32 @@ export async function GET(request: NextRequest) {
     // Transaction status breakdown
     const txStatuses = await db.prepare('SELECT status, COUNT(*) as count FROM transactions WHERE tenant_id = ? GROUP BY status').all(tenantId);
 
+    // Per-tenant 7-day productivity series — every user sees their OWN graph,
+    // even when all zeros (new users). Bucketed in JS to stay PG/SQLite compatible.
+    const docDates = (await db.prepare('SELECT created_at as d FROM documents WHERE tenant_id = ?').all(tenantId) as any[]) || [];
+    const txRows = (await db.prepare('SELECT date as d, status, created_at as c FROM transactions WHERE tenant_id = ?').all(tenantId) as any[]) || [];
+    const reconDates = (await db.prepare('SELECT created_at as d, status FROM reconciliations WHERE tenant_id = ?').all(tenantId) as any[]) || [];
+    const clientDates = (await db.prepare('SELECT created_at as d FROM clients WHERE tenant_id = ?').all(tenantId) as any[]) || [];
+    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+    const days: { date: string; label: string }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push({ date: dayKey(d), label: d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) });
+    }
+    const countOn = (rows: any[], getDate: (r: any) => string, day: string) =>
+      rows.filter((r) => String(getDate(r) || '').slice(0, 10) === day).length;
+    const productivity = days.map((day) => ({
+      date: day.date,
+      label: day.label,
+      documents: countOn(docDates, (r) => r.d, day.date),
+      transactions: countOn(txRows, (r) => r.d || r.c, day.date),
+      matched: txRows.filter((r) => r.status === 'matched' && String(r.d || r.c || '').slice(0, 10) === day.date).length,
+      exceptions: txRows.filter((r) => r.status === 'exception' && String(r.d || r.c || '').slice(0, 10) === day.date).length,
+      reconciliations: countOn(reconDates, (r) => r.d, day.date),
+      clients: countOn(clientDates, (r) => r.d, day.date),
+    }));
+
     return NextResponse.json({
       stats: {
         totalClients,
@@ -44,6 +70,7 @@ export async function GET(request: NextRequest) {
       recentRecons,
       docTypes,
       txStatuses,
+      productivity,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

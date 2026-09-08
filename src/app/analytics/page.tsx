@@ -29,9 +29,12 @@ export default function AnalyticsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const h = getAnonHeaders() as Record<string, string>;
-      const res = await fetch(`/api/analytics?range=${range}`, { headers: h });
+      const res = await fetch(`/api/analytics?range=${range}`);
       const d = await res.json();
+      if (d.error) {
+        if (res.status === 403) window.location.href = '/dashboard';
+        return;
+      }
       if (!d.error) setData(d);
     } catch {}
     setLoading(false);

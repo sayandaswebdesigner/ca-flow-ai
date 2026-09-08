@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbAsync } from '@/lib/db';
-import { getRequestTenant } from '@/lib/auth';
+import { getRequestTenant, getSessionUser, getTokenFromRequest, isAdminEmail } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 
 export async function GET(request: NextRequest) {
   try {
+    const viewer = await getSessionUser(getTokenFromRequest(request));
+    if (!viewer || !isAdminEmail(viewer.email)) {
+      return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 });
+    }
     const db = await getDbAsync();
     // Global visits — all tenants (so Safari & Chrome show same)
     const total = (await db.prepare('SELECT COUNT(*) as c FROM visits').get() as any).c as number;

@@ -45,7 +45,6 @@ type View = 'dashboard' | 'documents' | 'transactions' | 'reconciliations' | 'cl
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview' },
-  { id: 'analytics', label: 'Analytics', icon: TrendingUp, desc: 'Usage & visits' },
   { id: 'documents', label: 'Documents', icon: FileText, desc: 'Uploads' },
   { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight, desc: 'Ledger entries' },
   { id: 'reconciliations', label: 'Reconciliations', icon: BarChart3, desc: 'Match & review' },
@@ -54,6 +53,11 @@ const NAV_ITEMS = [
   { id: 'reviews', label: 'Reviews', icon: Sparkles, desc: 'Wall & capture' },
   { id: 'history', label: 'History', icon: Activity, desc: 'Past records' },
   { id: 'plugins', label: 'Plugins', icon: Puzzle, desc: 'Integrations' },
+] as const;
+
+// Admin-only nav (separate from user dashboard)
+const ADMIN_NAV_ITEMS = [
+  { id: 'analytics', label: 'Analytics', icon: TrendingUp, desc: 'Owner only' },
 ] as const;
 
 // ---------- helpers ----------
@@ -899,14 +903,15 @@ function HistoryView({ transactions, reconciliations, clients }: { transactions:
 // ---------- page ----------
 export default function CAFlowDashboard() {
   const [view, setView] = useState<View>('dashboard');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [stats, setStats] = useState<any>(null);
+  const [productivity, setProductivity] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [reconciliations, setReconciliations] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [insights, setInsights] = useState<any>(null);
   const [reviews, setReviews] = useState<{ reviews: any[]; stats: { count: number; avg: number; dist: Record<number, number> } } | null>(null);
-  const [visits, setVisits] = useState<{ total: number; unique: number; today: number; last7: any[]; recent: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -936,7 +941,7 @@ export default function CAFlowDashboard() {
     setLoading(true);
     try {
       const h = getAnonHeaders();
-      const [statsRes, docsRes, txRes, reconsRes, clientsRes, insightsRes, reviewsRes, visitsRes] = await Promise.all([
+      const [statsRes, docsRes, txRes, reconsRes, clientsRes, insightsRes, reviewsRes] = await Promise.all([
         fetch('/api/reports', { headers: h }),
         fetch('/api/documents', { headers: h }),
         fetch('/api/transactions?limit=200', { headers: h }),
@@ -944,9 +949,8 @@ export default function CAFlowDashboard() {
         fetch('/api/clients', { headers: h }),
         fetch('/api/insights', { headers: h }),
         fetch('/api/reviews?limit=50', { headers: h }),
-        fetch('/api/visits', { headers: h }),
       ]);
-      const [statsData, docsData, txData, reconsData, clientsData, insightsData, reviewsData, visitsData] = await Promise.all([
+      const [statsData, docsData, txData, reconsData, clientsData, insightsData, reviewsData] = await Promise.all([
         statsRes.json(),
         docsRes.json(),
         txRes.json(),
@@ -954,20 +958,15 @@ export default function CAFlowDashboard() {
         clientsRes.json(),
         insightsRes.json(),
         reviewsRes.json(),
-        visitsRes.json(),
       ]);
       setStats(statsData.stats);
+      setProductivity(statsData.productivity || []);
       setDocuments(docsData.documents || []);
       setTransactions(txData.transactions || []);
       setReconciliations(reconsData.reconciliations || []);
       setClients(clientsData.clients || []);
       setInsights(insightsData.error ? null : insightsData);
       setReviews(reviewsData.error ? null : reviewsData);
-      // visits can fail on pg text cast — fallback to zeros
-      if (visitsData.error) {
-        console.warn('visits error', visitsData.error);
-        setVisits({ total: 0, unique: 0, today: 0, last7: [], recent: [] });
-      } else setVisits(visitsData);
     } catch (e) {
       console.error(e);
       notify('Failed to load data');
@@ -976,11 +975,12 @@ export default function CAFlowDashboard() {
     }
   }
 
-  // auto-log visit once per mount + detect login state
+  // auto-log visit once per mount + detect login state + admin
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
       const loggedIn = !!d.user;
       setIsLoggedIn(loggedIn);
+      setIsAdmin(!!d.isAdmin);
       localStorage.setItem('ca_logged_in', loggedIn ? 'true' : 'false');
     }).catch(() => {});
 
@@ -1134,9 +1134,13 @@ export default function CAFlowDashboard() {
         setView('history');
         response = 'Switched to History view.';
       } else if (lower.includes('show') && lower.includes('analytics') || lower === 'analytics' || lower.includes('open analytics')) {
-        trackEvent('view', 'analytics');
-        window.open('/analytics', '_blank');
-        response = 'Opening Analytics in a new tab — live visits, tab usage & plugin stats, separate from dashboard.';
+        if (!isAdmin) {
+          response = 'Analytics is owner-only and not available on your account.';
+        } else {
+          trackEvent('view', 'analytics');
+          window.open('/analytics', '_blank');
+          response = 'Opening Analytics in a new tab — live visits, tab usage & plugin stats (owner only).';
+        }
       } else if (lower.includes('create') && lower.includes('client')) {
         setShowClientModal(true);
         response = 'Opened the client creation form. Fill in the details and save.';
@@ -1307,28 +1311,22 @@ export default function CAFlowDashboard() {
 
       {/* Sidebar */}
       <aside className="hidden lg:flex w-[286px] bg-white/80 glass border-r border-slate-200 flex-col sticky top-0 h-screen">
-        <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-[13px] shadow-md">LF</div>
+        <div className="px-6 py-5 border-b border-slate-200 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-[13px] shadow-sm">LF</div>
           <div className="min-w-0">
-            <h1 className="font-semibold text-[15px] tracking-tight leading-none">LedgerFlow</h1>
-            <p className="text-[11px] text-slate-500 mt-0.5">Reconciliation OS</p>
+            <p className="font-semibold text-[15px] tracking-tight leading-none">LedgerFlow</p>
+            <p className="text-[11px] text-slate-500 tracking-wide uppercase font-medium">Reconciliation OS</p>
           </div>
-          <span className="ml-auto text-[10px] px-2 py-1 rounded-full bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-700 border border-indigo-100 font-medium">PRO</span>
+          <span className="ml-auto text-[10px] px-2 py-1 rounded-full bg-slate-900 text-white font-semibold">PRO</span>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-auto">
           {NAV_ITEMS.map((item) => {
             const active = view === item.id;
-            const isAnalytics = item.id === 'analytics';
             return (
               <button
                 key={item.id}
-                onClick={() => {
-                  if (isAnalytics) {
-                    trackEvent('view', 'analytics');
-                    window.open('/analytics', '_blank');
-                  } else setView(item.id as View);
-                }}
+                onClick={() => setView(item.id as View)}
                 className={cls(
                   'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all text-left relative',
                   active
@@ -1339,13 +1337,26 @@ export default function CAFlowDashboard() {
                 <item.icon size={18} className={cls(active ? 'text-white' : 'text-slate-500')} />
                 <span className="flex-1 min-w-0">
                   <span className={cls('block leading-none', active ? 'font-medium' : 'font-medium')}>{item.label}</span>
-                  <span className={cls('block text-[11px] leading-none mt-1', active ? 'text-indigo-100' : 'text-slate-400')}>{item.desc} {isAnalytics && '↗'}</span>
+                  <span className={cls('block text-[11px] leading-none mt-1', active ? 'text-indigo-100' : 'text-slate-400')}>{item.desc}</span>
                 </span>
-                {active && !isAnalytics && <ChevronRight size={14} className="text-indigo-200" />}
-                {isAnalytics && <ExternalLink size={12} className="text-slate-400" />}
+                {active && <ChevronRight size={14} className="text-indigo-200" />}
               </button>
             );
           })}
+          {isAdmin && ADMIN_NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => window.open('/analytics', '_blank')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-amber-700 hover:bg-amber-50 border border-amber-100 text-left"
+            >
+              <item.icon size={18} className="text-amber-600" />
+              <span className="flex-1 min-w-0">
+                <span className="block leading-none font-medium">{item.label}</span>
+                <span className="block text-[11px] leading-none mt-1 text-amber-600/70">{item.desc} ↗</span>
+              </span>
+              <ExternalLink size={12} className="text-amber-400" />
+            </button>
+          ))}
         </nav>
 
         <div className="p-4 border-t border-slate-100">
@@ -1375,8 +1386,9 @@ export default function CAFlowDashboard() {
         <header className="sticky top-0 z-20 glass border-b border-slate-200">
           <div className="px-4 lg:px-8 py-3 flex items-center gap-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="lg:hidden w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">CF</div>
-              <h2 className="text-[22px] font-semibold tracking-tight capitalize hidden sm:block">{view === 'insights' ? 'Smart Insights' : view}</h2>
+              <div className="lg:hidden w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-xs">LF</div>
+              <h2 className="text-[18px] font-semibold tracking-tight capitalize hidden sm:block">{view === 'insights' ? 'Smart Insights' : view}</h2>
+              <span className="hidden sm:inline text-[11px] text-slate-500">• Secure • India-hosted</span>
               <span className="hidden md:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 Live
@@ -1396,13 +1408,11 @@ export default function CAFlowDashboard() {
             </div>
 
             <div className="flex items-center gap-2 ml-auto">
-              {/* visits live */}
-              <div className="hidden md:flex items-center gap-2 pl-3 pr-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-sm text-xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-medium">{visits?.total ?? 0} visits</span>
-                <span className="text-slate-400">• {visits?.unique ?? 0} unique</span>
-                <span className="text-slate-400">• today {visits?.today ?? 0}</span>
-              </div>
+              {isAdmin && (
+                <a href="/analytics" target="_blank" className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium hover:bg-amber-100">
+                  <TrendingUp size={12} /> Analytics ↗
+                </a>
+              )}
               <a
                 href={`/api/export?format=excel&tenantId=${encodeURIComponent(typeof window !== 'undefined' ? (localStorage.getItem('ca_anon_tenant') || '') : '')}`}
                 onClick={() => setTimeout(() => openReviewModalWithDraft(), 1200)}
@@ -1422,23 +1432,24 @@ export default function CAFlowDashboard() {
 
           {/* Mobile nav */}
           <div className="lg:hidden px-2 pb-3 flex gap-1.5 overflow-auto">
-            {NAV_ITEMS.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (item.id === 'analytics') {
-                    trackEvent('view', 'analytics');
-                    window.open('/analytics', '_blank');
-                  } else setView(item.id as View);
-                }}
-                className={cls(
-                  'flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap border',
-                  view === item.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'
-                )}
-              >
-                <item.icon size={14} /> {item.label} {item.id === 'analytics' && '↗'}
-              </button>
-            ))}
+            {[...NAV_ITEMS, ...(isAdmin ? [...ADMIN_NAV_ITEMS] : [])].map((item) => {
+              const admin = (ADMIN_NAV_ITEMS as any).some((a: any) => a.id === item.id);
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (admin) window.open('/analytics', '_blank');
+                    else setView(item.id as View);
+                  }}
+                  className={cls(
+                    'flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap border',
+                    admin ? 'bg-amber-50 text-amber-700 border-amber-200' : view === item.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'
+                  )}
+                >
+                  <item.icon size={14} /> {item.label} {admin && '↗'}
+                </button>
+              );
+            })}
           </div>
         </header>
 
@@ -1452,7 +1463,7 @@ export default function CAFlowDashboard() {
             </div>
           ) : (
             <>
-              {view === 'dashboard' && <DashboardView stats={stats} documents={documents} reconciliations={reconciliations} clients={clients} onView={setView} />}
+              {view === 'dashboard' && <DashboardView stats={stats} documents={documents} reconciliations={reconciliations} clients={clients} productivity={productivity} transactions={transactions} onView={setView} />}
               {view === 'documents' && <DocumentsView documents={documents} clients={clients} onUpload={handleUpload} onRefresh={loadAll} />}
               {view === 'transactions' && <TransactionsView transactions={filteredTx} query={query} onRefresh={loadAll} />}
               {view === 'reconciliations' && (
@@ -1468,8 +1479,8 @@ export default function CAFlowDashboard() {
               )}
               {view === 'clients' && <ClientsView clients={clients} onRefresh={loadAll} showModal={showClientModal} setShowModal={setShowClientModal} />}
               {view === 'insights' && <InsightsView insights={insights} />}
-              {view === 'analytics' && <AnalyticsView />}
-              {view === 'reviews' && <ReviewsView reviews={reviews} visits={visits} onSubmit={submitReview} onRefresh={loadAll} />}
+              {/* analytics is admin-only at /analytics — not inside dashboard */}
+              {view === 'reviews' && <ReviewsView reviews={reviews} onSubmit={submitReview} onRefresh={loadAll} />}
               {view === 'plugins' && <PluginsView onNavigate={setView} />}
               {view === 'history' && <HistoryView transactions={transactions} reconciliations={reconciliations} clients={clients} />}
             </>
@@ -1650,46 +1661,63 @@ export default function CAFlowDashboard() {
 }
 
 // ---------- dashboard ----------
-function MiniSpark({ color = '#4f46e5' }: { color?: string }) {
-  const d = `M0 12 L8 8 L16 14 L24 6 L32 10 L40 4 L48 12`;
+// Data-driven sparkline: every user sees their OWN 7-day trend.
+// Falls back to a gentle flat line for brand-new (all-zero) workspaces.
+function MiniSpark({ color = '#4f46e5', data }: { color?: string; data?: number[] }) {
+  const vals = (data && data.length ? data : [0, 0, 0, 1, 0, 1, 0]).slice(-7);
+  const max = Math.max(...vals, 1);
+  const min = Math.min(...vals, 0);
+  const span = Math.max(max - min, 1);
+  const pts = vals.map((v, i) => {
+    const x = (i / Math.max(vals.length - 1, 1)) * 48;
+    const y = 13 - ((v - min) / span) * 10;
+    return `${x.toFixed(1)} ${y.toFixed(1)}`;
+  });
+  const d = 'M' + pts.join(' L');
   return (
-    <svg width="48" height="16" viewBox="0 0 48 16" className="opacity-80">
+    <svg width="56" height="18" viewBox="0 0 48 16" className="opacity-90" aria-hidden>
       <path d={d} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       <path d={`${d} L48 16 L0 16 Z`} fill={color} opacity="0.08" />
     </svg>
   );
 }
 
-function StatCard({ icon: Icon, label, value, sub, trend, tone = 'slate' }: any) {
-  const tones: Record<string, { bg: string; icon: string }> = {
-    indigo: { bg: 'from-indigo-500 to-violet-500', icon: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
-    emerald: { bg: 'from-emerald-500 to-teal-500', icon: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
-    amber: { bg: 'from-amber-500 to-orange-500', icon: 'bg-amber-50 text-amber-600 border-amber-100' },
-    slate: { bg: 'from-slate-700 to-slate-900', icon: 'bg-slate-50 text-slate-600 border-slate-200' },
+function StatCard({ icon: Icon, label, value, sub, trend, tone = 'slate', spark }: any) {
+  const tones: Record<string, { top: string; icon: string; spark: string }> = {
+    indigo: { top: 'bg-gradient-to-r from-indigo-500 to-violet-500', icon: 'bg-indigo-50 text-indigo-600 border-indigo-100', spark: '#6366f1' },
+    slate: { top: 'bg-slate-800', icon: 'bg-slate-100 text-slate-600 border-slate-200', spark: '#64748b' },
+    emerald: { top: 'bg-gradient-to-r from-emerald-500 to-teal-400', icon: 'bg-emerald-50 text-emerald-600 border-emerald-100', spark: '#10b981' },
+    amber: { top: 'bg-gradient-to-r from-amber-400 to-orange-500', icon: 'bg-amber-50 text-amber-600 border-amber-100', spark: '#f59e0b' },
   };
   const t = tones[tone] || tones.slate;
-  const sparkColor = tone === 'emerald' ? '#10b981' : tone === 'amber' ? '#f59e0b' : tone === 'indigo' ? '#6366f1' : '#64748b';
+  const sparkColor = t.spark;
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm card-hover gradient-border overflow-hidden relative">
-      <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${t.bg} opacity-60`} />
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm card-hover overflow-hidden relative">
+      <div className={`absolute top-0 left-0 right-0 h-[3px] ${t.top} opacity-80`} />
       <div className="flex items-start justify-between">
         <div className={cls('w-10 h-10 rounded-xl border flex items-center justify-center shadow-sm', t.icon)}>
           <Icon size={18} />
         </div>
-        <div className="flex items-center gap-2">
-          <MiniSpark color={sparkColor} />
-          {trend && <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">{trend}</span>}
-        </div>
+        <MiniSpark color={sparkColor} data={spark} />
       </div>
       <p className="text-[11px] font-semibold text-slate-500 mt-3 tracking-widest uppercase">{label}</p>
       <p className="text-2xl font-semibold tracking-tight mt-1">{value}</p>
       {sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
+      {trend && <span className="inline-block mt-2 text-[11px] px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">{trend}</span>}
     </div>
   );
 }
 
-function DashboardView({ stats, documents, reconciliations, clients, onView }: any) {
+function DashboardView({ stats, documents, reconciliations, clients, productivity, transactions, onView }: any) {
   const hasData = (stats?.totalClients || 0) > 0;
+  // Per-user 7-day spark series — prefer server productivity, fallback to client-side buckets.
+  const prod: any[] = Array.isArray(productivity) && productivity.length ? productivity : [];
+  const sparkOf = (key: string): number[] => {
+    if (prod.length) return prod.map((d: any) => Number(d[key] || 0));
+    return [0, 0, 0, 0, 0, 0, 0];
+  };
+  const prodTotal = (key: string) => sparkOf(key).reduce((a: number, b: number) => a + b, 0);
+  const hasProd = prodTotal('documents') + prodTotal('transactions') + prodTotal('reconciliations') + prodTotal('clients') > 0;
   return (
     <div className="space-y-6">
       {/* Hero if empty */}
@@ -1730,10 +1758,42 @@ function DashboardView({ stats, documents, reconciliations, clients, onView }: a
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Building2} label="Clients" value={stats?.totalClients ?? 0} sub="Active ledgers" tone="indigo" />
-        <StatCard icon={FileText} label="Documents" value={stats?.totalDocuments ?? 0} sub={`${stats?.totalTransactions ?? 0} transactions`} tone="slate" />
-        <StatCard icon={TrendingUp} label="Match rate" value={`${stats?.matchRate ?? 0}%`} sub={`${stats?.totalMatched ?? 0} matched`} tone="emerald" trend={(stats?.matchRate ?? 0) >= 80 ? 'Healthy' : undefined} />
-        <StatCard icon={AlertTriangle} label="Exceptions" value={stats?.totalExceptions ?? 0} sub={stats?.unreconciledAmount ? `${INR(stats.unreconciledAmount)} pending` : 'All clear'} tone="amber" />
+        <StatCard icon={Building2} label="Clients" value={stats?.totalClients ?? 0} sub="Active ledgers" tone="indigo" spark={sparkOf('clients')} />
+        <StatCard icon={FileText} label="Documents" value={stats?.totalDocuments ?? 0} sub={`${stats?.totalTransactions ?? 0} transactions`} tone="slate" spark={sparkOf('documents')} />
+        <StatCard icon={TrendingUp} label="Match rate" value={`${stats?.matchRate ?? 0}%`} sub={`${stats?.totalMatched ?? 0} matched`} tone="emerald" trend={(stats?.matchRate ?? 0) >= 80 ? 'Healthy' : undefined} spark={sparkOf('matched')} />
+        <StatCard icon={AlertTriangle} label="Exceptions" value={stats?.totalExceptions ?? 0} sub={(stats?.unreconciledAmount ?? stats?.unmatchedAmount) ? `${INR(stats.unreconciledAmount ?? stats.unmatchedAmount)} pending` : 'All clear'} tone="amber" spark={sparkOf('exceptions')} />
+      </div>
+
+      {/* Your Productivity — visible to EVERY user (even at 0) so each firm understands its own trend */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm card-hover">
+        <div className="flex flex-wrap items-center gap-2">
+          <Activity size={16} className="text-indigo-600" />
+          <h4 className="text-sm font-semibold">Your Productivity — last 7 days</h4>
+          <span className="ml-auto text-xs text-slate-500">Your firm only • updates as you work</span>
+        </div>
+        <p className="text-xs text-slate-500 mt-1">
+          {hasProd
+            ? 'Documents uploaded, transactions matched and exceptions per day — watch the lines climb as you reconcile.'
+            : 'This is your personal productivity graph. Add a client and upload your first statement — the lines will start moving.'}
+        </p>
+        <div className="mt-4 h-44">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={prod.length ? prod : [{ label: 'Day 1', documents: 0, matched: 0, exceptions: 0 }, { label: 'Day 2', documents: 0, matched: 0, exceptions: 0 }, { label: 'Day 3', documents: 0, matched: 0, exceptions: 0 }, { label: 'Day 4', documents: 0, matched: 0, exceptions: 0 }, { label: 'Day 5', documents: 0, matched: 0, exceptions: 0 }, { label: 'Day 6', documents: 0, matched: 0, exceptions: 0 }, { label: 'Today', documents: 0, matched: 0, exceptions: 0 }]}>
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={30} />
+              <Tooltip />
+              <Area type="monotone" dataKey="documents" name="Documents" stroke="#6366f1" fill="#e0e7ff" strokeWidth={2} />
+              <Area type="monotone" dataKey="matched" name="Matched" stroke="#10b981" fill="#d1fae5" strokeWidth={2} />
+              <Area type="monotone" dataKey="exceptions" name="Exceptions" stroke="#f59e0b" fill="#fef3c7" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        {!hasProd && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button onClick={() => onView('clients')} className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-500">+ Add first client</button>
+            <button onClick={() => onView('documents')} className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-medium hover:bg-slate-50">Upload documents</button>
+          </div>
+        )}
       </div>
 
       {/* Bento analytics — extraordinary but professional */}
@@ -2842,7 +2902,7 @@ function ConfettiBurst({ pieces = 36 }: { pieces?: number }) {
   );
 }
 
-function ReviewsView({ reviews, visits, onSubmit, onRefresh }: any) {
+function ReviewsView({ reviews, onSubmit, onRefresh }: any) {
   const [rating, setRating] = useState(5);
   const [text, setText] = useState('');
   const [author, setAuthor] = useState('CA User');
@@ -2884,7 +2944,7 @@ function ReviewsView({ reviews, visits, onSubmit, onRefresh }: any) {
             <p className="text-indigo-100 text-sm mt-1 max-w-xl">Honest, verified feedback from CAs who actually used LedgerFlow. We publish 1-5★ as-is — no incentive for rating value.</p>
             <div className="mt-3 inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/15 border border-white/20">
               <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
-              {visits ? `${visits.total} visits • ${visits.unique} unique • ${visits.today} today` : 'loading visits…'} • <a href={typeof window !== 'undefined' ? window.location.href : '#'} target="_blank" className="underline">public link</a>
+              <a href={typeof window !== 'undefined' ? window.location.href : '#'} target="_blank" className="underline">public link</a>
             </div>
             <div className="mt-4 flex gap-2">
               <a href={waShare} target="_blank" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-slate-900 text-sm font-medium">

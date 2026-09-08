@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbAsync } from '@/lib/db';
-import { getRequestTenant, getSessionUser, getTokenFromRequest } from '@/lib/auth';
+import { getRequestTenant, getSessionUser, getTokenFromRequest, isAdminEmail } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 
 export async function GET(request: NextRequest) {
   try {
+    // Admin-only: analytics is separate from user dashboard
+    const token = getTokenFromRequest(request);
+    const viewer = await getSessionUser(token);
+    if (!viewer || !isAdminEmail(viewer.email)) {
+      return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 });
+    }
     const db = await getDbAsync();
     const tenantId = await getRequestTenant(request);
     const { searchParams } = new URL(request.url);

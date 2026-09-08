@@ -95,6 +95,24 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   return getSessionUser(store.get(SESSION_COOKIE)?.value);
 }
 
+export function isAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const raw = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || '').trim();
+  if (!raw) return false;
+  const list = raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return list.includes(email.trim().toLowerCase());
+}
+
+export async function requireAdmin(request: NextRequest): Promise<SessionUser> {
+  const user = await getSessionUser(getTokenFromRequest(request));
+  if (!user) throw new Response(JSON.stringify({ error: 'Unauthorized — please log in' }), { status: 401 });
+  if (!isAdminEmail(user.email)) throw new Response(JSON.stringify({ error: 'Forbidden — admin only' }), { status: 403 });
+  return user;
+}
+
 export async function ensureTenant(db: any, tenantId: string, name = 'My Firm') {
   const t = await db.prepare('SELECT id FROM tenants WHERE id = ?').get(tenantId);
   if (!t) await db.prepare('INSERT INTO tenants (id, name, subscription_tier) VALUES (?, ?, ?)').run(tenantId, name, 'professional');
