@@ -25,7 +25,7 @@ function SignupForm() {
   const [verified, setVerified] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
-  // Live genuine-email check (free, debounced)
+  // Live email check — domain MX + gibberish detection (mailbox ownership still requires inbox code)
   useEffect(() => {
     const e = email.trim();
     if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { setEmailCheck(null); return; }
@@ -37,7 +37,7 @@ function SignupForm() {
         setEmailCheck({ genuine: !!d.genuine, reason: d.reason || '' });
       } catch { setEmailCheck(null); }
       setChecking(false);
-    }, 600);
+    }, 700);
     return () => clearTimeout(t);
   }, [email]);
 
@@ -157,13 +157,13 @@ function SignupForm() {
                 className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-4 ${emailCheck ? (emailCheck.genuine ? 'border-emerald-200 focus:ring-emerald-50 focus:border-emerald-300' : 'border-red-200 focus:ring-red-50 focus:border-red-300') : 'border-slate-200 focus:ring-indigo-50 focus:border-indigo-300'}`}
               />
               <div className="min-h-[18px]">
-                {checking && <p className="text-xs text-slate-500">Checking email…</p>}
+                {checking && <p className="text-xs text-slate-500">Checking… (domain MX + inbox name)</p>}
                 {!checking && emailCheck && (
                   <p className={`text-xs ${emailCheck.genuine ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {emailCheck.genuine ? `✓ Genuine — ${emailCheck.reason}` : `✗ Not genuine — ${emailCheck.reason}`}
+                    {emailCheck.genuine ? `✓ ${emailCheck.reason}` : `✗ ${emailCheck.reason}`}
                   </p>
                 )}
-                {!checking && !emailCheck && email.includes('@') && <p className="text-xs text-slate-400">Type to verify if email is genuine (free MX check)</p>}
+                {!checking && !emailCheck && email.includes('@') && <p className="text-xs text-slate-400">We check domain + inbox name — not just @gmail.com</p>}
               </div>
               {/* Free code verification — only if no-cost */}
               {emailCheck?.genuine && !verified && (
