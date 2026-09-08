@@ -17,8 +17,17 @@ export async function POST(request: NextRequest) {
     const existing = await db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim().toLowerCase());
     if (existing) return NextResponse.json({ error: 'Email already registered — please log in' }, { status: 409 });
 
+    // Require email verification — free: code must be verified via /api/auth/verify-code
+    if (process.env.EMAIL_VERIFICATION_REQUIRED !== 'false') {
+      const v = (await db.prepare('SELECT verified, expires_at as exp FROM email_verifications WHERE email = ?').get(email.trim().toLowerCase())) as any;
+      if (!v || Number(v.verified) !== 1) return NextResponse.json({ error: 'Verify your email first — send code and enter it' }, { status: 403 });
+      if (new Date(v.exp).getTime() < Date.now()) return NextResponse.json({ error: 'Verification expired — send a new code' }, { status: 403 });
+    }
+
     const hash = await hashPassword(password);
     const user = await createUserWithTenant(name, email, hash);
+    // consume verification
+    try { await db.prepare('DELETE FROM email_verifications WHERE email = ?').run(email.trim().toLowerCase()); } catch {}
     const token = await createSession(user.id);
     try {
       const db2 = await getDbAsync();

@@ -244,6 +244,14 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   user_agent TEXT,
   created_at TEXT DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS email_verifications (
+  email TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  attempts INTEGER DEFAULT 0,
+  verified INTEGER DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  created_at TEXT DEFAULT NOW()
+);
 `;
 
 // ---------- SQLite (local dev) ----------
@@ -417,6 +425,14 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   user_agent TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+);
+CREATE TABLE IF NOT EXISTS email_verifications (
+  email TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  attempts INTEGER DEFAULT 0,
+  verified INTEGER DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
 );
 `;
 

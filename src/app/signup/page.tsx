@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -12,6 +12,56 @@ function SignupForm() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Email genuine + code flow — 100% free (DNS MX + Resend free tier fallback)
+  const [emailCheck, setEmailCheck] = useState<null | { genuine: boolean; reason: string }>(null);
+  const [checking, setChecking] = useState(false);
+  const [code, setCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [devCode, setDevCode] = useState<string | null>(null);
+
+  // Live genuine-email check (free, debounced)
+  useEffect(() => {
+    const e = email.trim();
+    if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { setEmailCheck(null); return; }
+    setChecking(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch('/api/auth/email-check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: e }) });
+        const d = await r.json();
+        setEmailCheck({ genuine: !!d.genuine, reason: d.reason || '' });
+      } catch { setEmailCheck(null); }
+      setChecking(false);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [email]);
+
+  async function sendCode() {
+    setError(null);
+    if (!emailCheck?.genuine) { setError('Fix email first — must be genuine (has mail server)'); return; }
+    setSendingCode(true);
+    try {
+      const r = await fetch('/api/auth/send-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim() }) });
+      const d = await r.json();
+      if (!r.ok) { setError(d.error || 'Failed to send code'); return; }
+      setCodeSent(true);
+      setDevCode(d.devCode || null);
+    } finally { setSendingCode(false); }
+  }
+
+  async function verify() {
+    setError(null);
+    if (!code.trim()) { setError('Enter the 6-digit code'); return; }
+    setVerifying(true);
+    try {
+      const r = await fetch('/api/auth/verify-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim(), code: code.trim() }) });
+      const d = await r.json();
+      if (!r.ok) { setError(d.error || 'Verification failed'); return; }
+      setVerified(true);
+    } finally { setVerifying(false); }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -99,11 +149,39 @@ function SignupForm() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setVerified(false); setCodeSent(false); setDevCode(null); }}
                 placeholder="you@firm.in"
                 autoComplete="email"
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300"
+                className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-4 ${emailCheck ? (emailCheck.genuine ? 'border-emerald-200 focus:ring-emerald-50 focus:border-emerald-300' : 'border-red-200 focus:ring-red-50 focus:border-red-300') : 'border-slate-200 focus:ring-indigo-50 focus:border-indigo-300'}`}
               />
+              <div className="min-h-[18px]">
+                {checking && <p className="text-xs text-slate-500">Checking email…</p>}
+                {!checking && emailCheck && (
+                  <p className={`text-xs ${emailCheck.genuine ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {emailCheck.genuine ? `✓ Genuine — ${emailCheck.reason}` : `✗ Not genuine — ${emailCheck.reason}`}
+                  </p>
+                )}
+                {!checking && !emailCheck && email.includes('@') && <p className="text-xs text-slate-400">Type to verify if email is genuine (free MX check)</p>}
+              </div>
+              {/* Free code verification — only if no-cost */}
+              {emailCheck?.genuine && !verified && (
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={sendCode} disabled={sendingCode} className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-medium disabled:opacity-50">
+                    {sendingCode ? 'Sending…' : codeSent ? 'Resend code' : 'Send verification code'}
+                  </button>
+                  {codeSent && <span className="text-xs text-slate-500 self-center">Code sent • expires in 10m</span>}
+                </div>
+              )}
+              {codeSent && !verified && (
+                <div className="mt-2 flex gap-2">
+                  <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Enter 6-digit code" maxLength={6} className="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm tracking-widest focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300" />
+                  <button type="button" onClick={verify} disabled={verifying} className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium disabled:opacity-50">
+                    {verifying ? 'Verifying…' : 'Verify'}
+                  </button>
+                </div>
+              )}
+              {devCode && !verified && <p className="text-xs text-amber-600 mt-1">Dev mode (no RESEND_API_KEY): code is <span className="font-mono font-bold">{devCode}</span> — free mock</p>}
+              {verified && <p className="text-xs text-emerald-600 mt-1.5">✓ Email verified — you can now create your account</p>}
             </label>
             <div className="grid grid-cols-2 gap-4">
               <label className="block space-y-1.5">
@@ -132,11 +210,13 @@ function SignupForm() {
             {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">{error}</p>}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl cta-shine text-white font-semibold text-sm shadow-lg disabled:opacity-50"
+              disabled={loading || !verified}
+              title={!verified ? 'Verify email code first' : undefined}
+              className={`w-full py-3 rounded-xl font-semibold text-sm shadow-lg disabled:opacity-50 ${verified ? 'cta-shine text-white' : 'bg-slate-200 text-slate-500'}`}
             >
-              {loading ? 'Creating workspace…' : 'Create account →'}
+              {loading ? 'Creating workspace…' : verified ? 'Create account →' : 'Verify email to continue'}
             </button>
+            {!verified && <p className="text-xs text-slate-500 text-center -mt-2">Free verification • No paid service • Resend free tier or dev mock</p>}
           </form>
 
           <div className="flex items-center gap-3 my-6">
