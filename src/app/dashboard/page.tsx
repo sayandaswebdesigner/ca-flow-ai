@@ -1356,12 +1356,13 @@ export default function CAFlowDashboard() {
             <button
               key={item.id}
               onClick={() => {
+                const analyticsUrl = 'https://ledgerflow-analytics.vercel.app';
                 if (!isAdmin) {
-                  notify('Analytics is owner-only — please log in as owner (sayandaswebdesigner@gmail.com)');
-                  setTimeout(() => window.open('/analytics', '_blank'), 800);
+                  notify('Analytics is owner-only — separate site, log in as owner');
+                  setTimeout(() => window.open(analyticsUrl, '_blank'), 800);
                   return;
                 }
-                window.open('/analytics', '_blank');
+                window.open(analyticsUrl, '_blank');
               }}
               className={cls('w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left border', isAdmin ? 'text-amber-700 hover:bg-amber-50 border-amber-100' : 'text-slate-500 hover:bg-slate-50 border-slate-200 opacity-90')}
             >
