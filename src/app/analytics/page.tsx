@@ -122,6 +122,63 @@ export default function AnalyticsPage() {
           ))}
         </div>
 
+        {/* WORK vs VISIT — are people actually working or just browsing? */}
+        {(() => {
+          const ws = data.owner?.workStats || {};
+          const working = ws.workingTenants ?? 0;
+          const visitor = ws.visitorOnly ?? 0;
+          const totalT = ws.totalTenants ?? 0;
+          const rate = ws.workRate ?? 0;
+          const engagement = ws.engagementRatio ?? '0';
+          const totalActs = ws.totalActivitiesAll ?? 0;
+          return (
+            <div className="bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 rounded-3xl p-6 text-white relative overflow-hidden shadow-xl">
+              <div className="absolute -right-10 -top-10 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+              <div className="absolute -left-10 -bottom-10 w-64 h-64 bg-violet-500/20 rounded-full blur-3xl" />
+              <div className="relative">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/10 border border-white/20 font-medium"><Zap size={14} className="text-yellow-300" /> Work vs Visit</p>
+                    <h3 className="text-xl font-semibold mt-3">Are people actually working or just visiting?</h3>
+                    <p className="text-indigo-200 text-sm mt-1 max-w-2xl">Working = created a client, uploaded a document, ran a reconciliation, or any tracked activity. Visitor = only opened the site.</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-3xl font-bold">{rate}%</p>
+                    <p className="text-xs text-indigo-200">working firms</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-4">
+                    <p className="text-xs text-indigo-200">Total firms</p>
+                    <p className="text-2xl font-bold mt-1">{totalT}</p>
+                    <p className="text-xs text-indigo-300 mt-1">tenants seen</p>
+                  </div>
+                  <div className="bg-emerald-500/20 border border-emerald-400/30 rounded-2xl p-4">
+                    <p className="text-xs text-emerald-200">Actually working</p>
+                    <p className="text-2xl font-bold mt-1 text-emerald-300">{working}</p>
+                    <p className="text-xs text-emerald-200/80 mt-1">{totalActs} total activities</p>
+                  </div>
+                  <div className="bg-amber-500/20 border border-amber-400/30 rounded-2xl p-4">
+                    <p className="text-xs text-amber-200">Just visiting</p>
+                    <p className="text-2xl font-bold mt-1 text-amber-300">{visitor}</p>
+                    <p className="text-xs text-amber-200/80 mt-1">bounced without work</p>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-4">
+                    <p className="text-xs text-indigo-200">Engagement</p>
+                    <p className="text-2xl font-bold mt-1">{engagement}</p>
+                    <p className="text-xs text-indigo-300 mt-1">activities per visit</p>
+                  </div>
+                </div>
+                <div className="mt-4 h-2 bg-white/10 rounded-full overflow-hidden flex">
+                  <div className="bg-emerald-400 h-2" style={{ width: `${rate}%` }} />
+                  <div className="bg-amber-400/60 h-2" style={{ width: `${100 - rate}%` }} />
+                </div>
+                <p className="text-[11px] text-indigo-300 mt-2">{working} working • {visitor} visitor-only • {totalActs} activities across {ws.totalVisitsAll ?? v.total ?? 0} visits</p>
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="grid lg:grid-cols-2 gap-4">
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
             <h4 className="font-semibold text-sm">Visits — {range === '7d' ? 'Last 7 days' : 'Last 30 days'}</h4>
@@ -266,34 +323,70 @@ export default function AnalyticsPage() {
         )}
 
         {tab === 'tenants' && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-slate-100 font-semibold text-sm">Tenants — firms on LedgerFlow</div>
-            <div className="overflow-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 text-slate-500">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Firm</th>
-                    <th className="px-4 py-2 text-left">ID</th>
-                    <th className="px-4 py-2 text-center">Users</th>
-                    <th className="px-4 py-2 text-center">Clients</th>
-                    <th className="px-4 py-2 text-center">Docs</th>
-                    <th className="px-4 py-2 text-left">Created</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(data.owner?.tenants || []).map((t: any) => (
-                    <tr key={t.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-2 font-medium">{t.name}</td>
-                      <td className="px-4 py-2 font-mono text-slate-500">{t.id.slice(0, 8)}…</td>
-                      <td className="px-4 py-2 text-center">{t.users}</td>
-                      <td className="px-4 py-2 text-center">{t.clients}</td>
-                      <td className="px-4 py-2 text-center">{t.docs}</td>
-                      <td className="px-4 py-2 text-slate-500">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p className="text-xs text-slate-500">Working firms</p>
+                <p className="text-xl font-bold text-emerald-600">{data.owner?.workStats?.workingTenants ?? 0}</p>
+                <p className="text-[11px] text-slate-400">have real work</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p className="text-xs text-slate-500">Just visiting</p>
+                <p className="text-xl font-bold text-amber-600">{data.owner?.workStats?.visitorOnly ?? 0}</p>
+                <p className="text-[11px] text-slate-400">no activity yet</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
+                <p className="text-xs text-slate-500">Total activities</p>
+                <p className="text-xl font-bold">{data.owner?.workStats?.totalActivitiesAll ?? 0}</p>
+                <p className="text-[11px] text-slate-400">{data.owner?.workStats?.engagementRatio ?? 0} per visit</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-semibold text-sm">Tenants — firms on LedgerFlow <span className="font-normal text-slate-500">• working vs visitor</span></h3>
+                <span className="text-xs px-2 py-1 rounded-full bg-slate-900 text-white">{(data.owner?.tenants || []).length} firms</span>
+              </div>
+              <div className="overflow-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Firm</th>
+                      <th className="px-3 py-2 text-center">Status</th>
+                      <th className="px-3 py-2 text-center">Clients</th>
+                      <th className="px-3 py-2 text-center">Docs</th>
+                      <th className="px-3 py-2 text-center">Tx</th>
+                      <th className="px-3 py-2 text-center">Recons</th>
+                      <th className="px-3 py-2 text-center">Activities</th>
+                      <th className="px-3 py-2 text-center">Visits</th>
+                      <th className="px-3 py-2 text-left">Last work</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {(!data.owner?.tenants || data.owner.tenants.length === 0) && <p className="px-4 py-6 text-center text-xs text-slate-500">No tenants yet.</p>}
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(data.owner?.tenants || []).map((t: any) => {
+                      const isWorking = Number(t.clients) > 0 || Number(t.docs) > 0 || Number(t.tx) > 0 || Number(t.recons) > 0 || Number(t.activities) > 0;
+                      return (
+                        <tr key={t.id} className={cls('hover:bg-slate-50', !isWorking && 'bg-amber-50/40')}>
+                          <td className="px-3 py-2 font-medium truncate max-w-[140px]" title={t.name}>{t.name}<span className="block font-mono text-[11px] text-slate-400">{t.id.slice(0, 8)}…</span></td>
+                          <td className="px-3 py-2 text-center">
+                            <span className={cls('px-2 py-1 rounded-full text-[11px] font-semibold border', isWorking ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700')}>
+                              {isWorking ? 'Working' : 'Visitor'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-center">{t.clients}</td>
+                          <td className="px-3 py-2 text-center">{t.docs}</td>
+                          <td className="px-3 py-2 text-center">{t.tx ?? 0}</td>
+                          <td className="px-3 py-2 text-center">{t.recons ?? 0}</td>
+                          <td className="px-3 py-2 text-center font-medium">{t.activities ?? 0}</td>
+                          <td className="px-3 py-2 text-center text-slate-500">{t.visits ?? 0}</td>
+                          <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{t.last_work_at ? new Date(t.last_work_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {(!data.owner?.tenants || data.owner.tenants.length === 0) && <p className="px-4 py-6 text-center text-xs text-slate-500">No tenants yet.</p>}
+              </div>
+              <p className="px-5 py-3 text-[11px] text-slate-400 bg-slate-50 border-t border-slate-100">Working = any client / document / transaction / reconciliation / activity. Visitor = only visits, no real work yet.</p>
             </div>
           </div>
         )}

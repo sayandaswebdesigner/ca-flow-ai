@@ -112,17 +112,55 @@ export async function GET(request: NextRequest) {
       globalActivityStats = (await db.prepare('SELECT action as name, COUNT(*) as count FROM activities GROUP BY action ORDER BY count DESC LIMIT 10').all()) as any[];
     } catch {}
 
-    // Tenants overview for owner
+    // Tenants overview for owner — enriched with work vs visit signal
     let tenants: any[] = [];
+    let workStats: any = { totalTenants: 0, workingTenants: 0, visitorOnly: 0, workRate: 0, totalActivitiesAll: 0, totalVisitsAll: 0 };
     try {
-      tenants = (await db.prepare('SELECT t.id, t.name, t.created_at, (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id) as users, (SELECT COUNT(*) FROM clients c WHERE c.tenant_id = t.id) as clients, (SELECT COUNT(*) FROM documents d WHERE d.tenant_id = t.id) as docs FROM tenants t ORDER BY t.created_at DESC LIMIT 50').all()) as any[];
+      tenants = (await db.prepare(
+        `SELECT t.id, t.name, t.created_at,
+          (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id) as users,
+          (SELECT COUNT(*) FROM clients c WHERE c.tenant_id = t.id) as clients,
+          (SELECT COUNT(*) FROM documents d WHERE d.tenant_id = t.id) as docs,
+          (SELECT COUNT(*) FROM transactions tx WHERE tx.tenant_id = t.id) as tx,
+          (SELECT COUNT(*) FROM reconciliations r WHERE r.tenant_id = t.id) as recons,
+          (SELECT COUNT(*) FROM activities a WHERE a.tenant_id = t.id) as activities,
+          (SELECT COUNT(*) FROM visits v WHERE v.tenant_id = t.id) as visits,
+          (SELECT MAX(created_at) FROM activities a2 WHERE a2.tenant_id = t.id) as last_work_at,
+          (SELECT MAX(created_at) FROM visits v2 WHERE v2.tenant_id = t.id) as last_visit_at
+        FROM tenants t ORDER BY t.created_at DESC LIMIT 100`
+      ).all()) as any[];
+      // compute work vs visit
+      const working = tenants.filter((t: any) => Number(t.clients) > 0 || Number(t.docs) > 0 || Number(t.tx) > 0 || Number(t.recons) > 0 || Number(t.activities) > 0);
+      workStats = {
+        totalTenants: tenants.length,
+        workingTenants: working.length,
+        visitorOnly: Math.max(0, tenants.length - working.length),
+        workRate: tenants.length ? Math.round((working.length / tenants.length) * 100) : 0,
+        totalActivitiesAll: tenants.reduce((s: number, t: any) => s + Number(t.activities || 0), 0),
+        totalVisitsAll: tenants.reduce((s: number, t: any) => s + Number(t.visits || 0), 0),
+        avgActivitiesPerTenant: tenants.length ? (tenants.reduce((s: number, t: any) => s + Number(t.activities || 0), 0) / tenants.length).toFixed(1) : '0',
+        engagementRatio: total ? ((workStats.totalActivitiesAll || tenants.reduce((s: number, t: any) => s + Number(t.activities || 0), 0)) / Math.max(1, total)).toFixed(2) : '0',
+      };
+      // engagement ratio as activities per visit
+      workStats.engagementRatio = tenants.length ? (workStats.totalActivitiesAll / Math.max(1, workStats.totalVisitsAll || total)).toFixed(2) : '0';
+    } catch {}
+
+    // Global events aggregated (all tenants) for tab popularity across everyone
+    let globalTopViews: any[] = [];
+    let globalTopTools: any[] = [];
+    try {
+      globalTopViews = (await db.prepare(`SELECT event_name as name, COUNT(*) as count FROM analytics_events WHERE event_type='view' GROUP BY event_name ORDER BY count DESC LIMIT 10`).all()) as any[] || [];
+      globalTopTools = (await db.prepare(`SELECT event_name as name, COUNT(*) as count FROM analytics_events WHERE event_type IN ('tool','plugin','action') GROUP BY event_name ORDER BY count DESC LIMIT 10`).all()) as any[] || [];
+      if (globalTopViews.length === 0) {
+        globalTopViews = (await db.prepare(`SELECT action as name, COUNT(*) as count FROM activities GROUP BY action ORDER BY count DESC LIMIT 10`).all()) as any[] || [];
+      }
     } catch {}
 
     return NextResponse.json({
       visits: { total, unique, today, todayUnique, activeNow, activeToday, lastDays, hourly, topPaths, recentVisits, tenantVisits },
-      events: { totalEvents, uniqueEventUsers, topViews, topPlugins, topTools, recentEvents },
+      events: { totalEvents, uniqueEventUsers, topViews, topPlugins, topTools, recentEvents, globalTopViews, globalTopTools },
       usage: { tenantClients, tenantDocs, tenantTx, totalActivities },
-      owner: { globalActivities, globalActivityStats, tenants },
+      owner: { globalActivities, globalActivityStats, tenants, workStats },
       generatedAt: new Date().toISOString(),
     });
   } catch (e: any) {
