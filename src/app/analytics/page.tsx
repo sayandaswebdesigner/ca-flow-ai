@@ -25,6 +25,7 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<any>(null);
   const [range, setRange] = useState<'7d' | '30d'>('7d');
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<'overview' | 'activities' | 'tenants'>('overview');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,28 +70,42 @@ export default function AnalyticsPage() {
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-xs">LF</div>
+          <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold text-xs">LF</div>
           <div>
-            <h1 className="font-semibold text-[15px] tracking-tight leading-none">LedgerFlow • Analytics</h1>
-            <p className="text-[11px] text-slate-500">Separate tab — live usage & visits</p>
+            <h1 className="font-semibold text-[15px] tracking-tight leading-none">LedgerFlow • Owner Analytics</h1>
+            <p className="text-[11px] text-slate-500">Private • Admin only • Separate website</p>
           </div>
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">🔒 Owner only</span>
           <a href="/dashboard" className="ml-auto px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800">← Back to Dashboard</a>
+        </div>
+        <div className="max-w-6xl mx-auto px-6 pb-3 flex gap-1.5">
+          {[
+            { id: 'overview', label: 'Overview' },
+            { id: 'activities', label: 'All Activities' },
+            { id: 'tenants', label: 'Tenants' },
+          ].map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id as any)} className={cls('px-3 py-1.5 rounded-full text-xs font-medium border', tab === t.id ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200')}>
+              {t.label}
+            </button>
+          ))}
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2"><TrendingUp size={18} className="text-indigo-600" /> Analytics — Who’s using LedgerFlow?</h2>
-            <p className="text-sm text-slate-500">Live visits, tab popularity, plugin usage — tenant-isolated, refreshed every 30s. This tab is separate from the dashboard.</p>
-          </div>
-          <div className="ml-auto flex gap-1.5 bg-slate-100 rounded-xl p-1">
-            {(['7d', '30d'] as const).map((r) => (
-              <button key={r} onClick={() => setRange(r)} className={cls('px-3 py-1.5 rounded-lg text-xs font-medium', range === r ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500')}>{r === '7d' ? 'Last 7 days' : 'Last 30 days'}</button>
-            ))}
-            <button onClick={load} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-200">↻</button>
-          </div>
-        </div>
+        {tab === 'overview' && (
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2"><TrendingUp size={18} className="text-indigo-600" /> Analytics — Who’s using LedgerFlow?</h2>
+                <p className="text-sm text-slate-500">Live visits, tab popularity, plugin usage — private owner view, refreshed every 30s. Separate from the dashboard.</p>
+              </div>
+              <div className="ml-auto flex gap-1.5 bg-slate-100 rounded-xl p-1">
+                {(['7d', '30d'] as const).map((r) => (
+                  <button key={r} onClick={() => setRange(r)} className={cls('px-3 py-1.5 rounded-lg text-xs font-medium', range === r ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500')}>{r === '7d' ? 'Last 7 days' : 'Last 30 days'}</button>
+                ))}
+                <button onClick={load} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-200">↻</button>
+              </div>
+            </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
@@ -214,6 +229,74 @@ export default function AnalyticsPage() {
             </div>
           </div>
         </div>
+          </>
+        )}
+
+        {tab === 'activities' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <h3 className="font-semibold text-sm">Activity breakdown (all tenants)</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(data.owner?.globalActivityStats || []).map((r: any) => (
+                  <span key={r.name} className="px-3 py-1.5 rounded-full bg-slate-900 text-white text-xs font-medium">
+                    {r.name} <span className="opacity-70">{r.count}</span>
+                  </span>
+                ))}
+                {(!data.owner?.globalActivityStats || data.owner.globalActivityStats.length === 0) && <p className="text-xs text-slate-500">No activities yet.</p>}
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-semibold text-sm">All Activities — live feed (owner)</h3>
+                <button onClick={load} className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs">↻ Refresh</button>
+              </div>
+              <div className="divide-y divide-slate-100 max-h-[600px] overflow-auto">
+                {(data.owner?.globalActivities || []).slice(0, 100).map((a: any) => (
+                  <div key={a.id} className="px-4 py-3 flex items-center gap-3 text-xs hover:bg-slate-50">
+                    <span className="px-2 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] font-medium">{a.action}</span>
+                    <span className="font-mono text-slate-500 truncate">{a.tenant_id.slice(0, 8)}…</span>
+                    <span className="flex-1 truncate">{a.entity_name || a.entity_id || '—'} <span className="text-slate-400">{a.details ? String(a.details).slice(0, 60) : ''}</span></span>
+                    <span className="text-slate-400 whitespace-nowrap">{new Date(a.created_at).toLocaleString('en-IN')}</span>
+                  </div>
+                ))}
+                {(!data.owner?.globalActivities || data.owner.globalActivities.length === 0) && <p className="px-4 py-10 text-center text-xs text-slate-500">No activities yet — users’ uploads, reconciliations and verifications will appear here.</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'tenants' && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-100 font-semibold text-sm">Tenants — firms on LedgerFlow</div>
+            <div className="overflow-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Firm</th>
+                    <th className="px-4 py-2 text-left">ID</th>
+                    <th className="px-4 py-2 text-center">Users</th>
+                    <th className="px-4 py-2 text-center">Clients</th>
+                    <th className="px-4 py-2 text-center">Docs</th>
+                    <th className="px-4 py-2 text-left">Created</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(data.owner?.tenants || []).map((t: any) => (
+                    <tr key={t.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-2 font-medium">{t.name}</td>
+                      <td className="px-4 py-2 font-mono text-slate-500">{t.id.slice(0, 8)}…</td>
+                      <td className="px-4 py-2 text-center">{t.users}</td>
+                      <td className="px-4 py-2 text-center">{t.clients}</td>
+                      <td className="px-4 py-2 text-center">{t.docs}</td>
+                      <td className="px-4 py-2 text-slate-500">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {(!data.owner?.tenants || data.owner.tenants.length === 0) && <p className="px-4 py-6 text-center text-xs text-slate-500">No tenants yet.</p>}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

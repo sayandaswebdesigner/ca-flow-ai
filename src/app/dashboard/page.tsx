@@ -1007,10 +1007,10 @@ export default function CAFlowDashboard() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isLoggedIn, signupWarningDismissed]);
 
-  // Show signup warning banner after 10s for anonymous users
+  // Show signup warning popup after 3s for anonymous users — not mandatory
   useEffect(() => {
     if (isLoggedIn || signupWarningDismissed) return;
-    const timer = setTimeout(() => setShowSignupWarning(true), 10000);
+    const timer = setTimeout(() => setShowSignupWarning(true), 3000);
     return () => clearTimeout(timer);
   }, [isLoggedIn, signupWarningDismissed]);
 
@@ -1277,34 +1277,43 @@ export default function CAFlowDashboard() {
 
   return (
     <div className="min-h-screen text-slate-900 flex">
-      {/* Signup Warning Banner — anonymous users */}
+      {/* Signup Warning — not mandatory, guest can continue */}
       {showSignupWarning && !isLoggedIn && !signupWarningDismissed && (
-        <div className="fixed top-0 left-0 right-0 z-50 animate-slideDown">
-          <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-b border-amber-200 px-4 py-3">
-            <div className="max-w-5xl mx-auto flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle size={18} className="text-amber-600" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => {
+              setShowSignupWarning(false);
+              setSignupWarningDismissed(true);
+              localStorage.setItem('ca_signup_warning_dismissed', 'true');
+            }}
+          />
+          <div className="relative bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-slideUp">
+            <div className="px-6 py-6 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto">
+                <AlertTriangle size={22} className="text-amber-600" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-amber-900">Your progress is not saved</p>
-                <p className="text-xs text-amber-700">Sign up to keep your data permanently. If you close this tab, everything will be lost.</p>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <a href="/signup" className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-sm transition-colors">
-                  Sign up free
-                </a>
-                <button
-                  onClick={() => {
-                    setShowSignupWarning(false);
-                    setSignupWarningDismissed(true);
-                    localStorage.setItem('ca_signup_warning_dismissed', 'true');
-                  }}
-                  className="px-3 py-2 rounded-xl border border-amber-200 hover:bg-amber-100 text-xs font-medium text-amber-700 transition-colors"
-                >
-                  I don't need it
-                </button>
-              </div>
+              <h3 className="text-lg font-semibold mt-4">Without sign in, all your work will be vanished</h3>
+              <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                You are using LedgerFlow as a guest. Your clients, documents and reconciliations are stored only in this browser. Sign up free to keep them permanently — otherwise they will be lost if you clear data or switch devices.
+              </p>
             </div>
+            <div className="px-6 pb-6 flex gap-2">
+              <a href="/signup" className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold text-center">
+                Sign up free
+              </a>
+              <button
+                onClick={() => {
+                  setShowSignupWarning(false);
+                  setSignupWarningDismissed(true);
+                  localStorage.setItem('ca_signup_warning_dismissed', 'true');
+                }}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-medium text-slate-700"
+              >
+                I don&apos;t need it
+              </button>
+            </div>
+            <p className="px-6 pb-4 text-center text-[11px] text-slate-400">You can continue without signing in. This popup won&apos;t show again.</p>
           </div>
         </div>
       )}

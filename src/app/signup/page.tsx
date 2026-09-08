@@ -12,6 +12,10 @@ function SignupForm() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    const e = new URLSearchParams(window.location.search).get('error');
+    if (e) setError(decodeURIComponent(e));
+  }, []);
   // Email genuine + code flow — 100% free (DNS MX + Resend free tier fallback)
   const [emailCheck, setEmailCheck] = useState<null | { genuine: boolean; reason: string }>(null);
   const [checking, setChecking] = useState(false);

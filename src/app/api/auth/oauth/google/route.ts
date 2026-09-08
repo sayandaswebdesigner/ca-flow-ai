@@ -4,13 +4,9 @@ import { randomBytes } from 'crypto';
 export async function GET(request: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   if (!clientId) {
-    return NextResponse.json(
-      {
-        error: 'Google OAuth not configured',
-        hint: 'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel → Settings → Environment Variables. Redirect URI: https://getledgerflow.vercel.app/api/auth/oauth/callback',
-      },
-      { status: 503 }
-    );
+    const url = new URL('/login', request.nextUrl.origin);
+    url.searchParams.set('error', 'Google sign-in is not configured yet — please use email or try again later.');
+    return NextResponse.redirect(url);
   }
   const state = randomBytes(16).toString('hex');
   const origin = request.nextUrl.origin;

@@ -104,10 +104,25 @@ export async function GET(request: NextRequest) {
     // Activities summary for this tenant
     const totalActivities = (await db.prepare('SELECT COUNT(*) as c FROM activities WHERE tenant_id = ?').get(tenantId) as any)?.c || 0;
 
+    // Global activities for owner — separate analytics website
+    let globalActivities: any[] = [];
+    let globalActivityStats: any[] = [];
+    try {
+      globalActivities = (await db.prepare('SELECT * FROM activities ORDER BY created_at DESC LIMIT 100').all()) as any[];
+      globalActivityStats = (await db.prepare('SELECT action as name, COUNT(*) as count FROM activities GROUP BY action ORDER BY count DESC LIMIT 10').all()) as any[];
+    } catch {}
+
+    // Tenants overview for owner
+    let tenants: any[] = [];
+    try {
+      tenants = (await db.prepare('SELECT t.id, t.name, t.created_at, (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id) as users, (SELECT COUNT(*) FROM clients c WHERE c.tenant_id = t.id) as clients, (SELECT COUNT(*) FROM documents d WHERE d.tenant_id = t.id) as docs FROM tenants t ORDER BY t.created_at DESC LIMIT 50').all()) as any[];
+    } catch {}
+
     return NextResponse.json({
       visits: { total, unique, today, todayUnique, activeNow, activeToday, lastDays, hourly, topPaths, recentVisits, tenantVisits },
       events: { totalEvents, uniqueEventUsers, topViews, topPlugins, topTools, recentEvents },
       usage: { tenantClients, tenantDocs, tenantTx, totalActivities },
+      owner: { globalActivities, globalActivityStats, tenants },
       generatedAt: new Date().toISOString(),
     });
   } catch (e: any) {

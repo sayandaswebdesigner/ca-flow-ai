@@ -3,15 +3,10 @@ import { randomBytes } from 'crypto';
 
 export async function GET(request: NextRequest) {
   const clientId = process.env.APPLE_CLIENT_ID;
-  // If not configured, redirect to a helpful page instead of crashing
   if (!clientId) {
-    return NextResponse.json(
-      {
-        error: 'Apple Sign-In not configured',
-        hint: 'Set APPLE_CLIENT_ID, APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY in Vercel. Redirect URI: https://getledgerflow.vercel.app/api/auth/oauth/callback. Google Sign-In is ready — use that for now.',
-      },
-      { status: 503 }
-    );
+    const url = new URL('/login', request.nextUrl.origin);
+    url.searchParams.set('error', 'Apple sign-in is not configured yet — please use Google or email.');
+    return NextResponse.redirect(url);
   }
   const state = randomBytes(16).toString('hex');
   const origin = request.nextUrl.origin;
