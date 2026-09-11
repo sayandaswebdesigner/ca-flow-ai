@@ -156,13 +156,16 @@ export async function GET(request: NextRequest) {
       }
     } catch {}
 
-    return NextResponse.json({
-      visits: { total, unique, today, todayUnique, activeNow, activeToday, lastDays, hourly, topPaths, recentVisits, tenantVisits },
-      events: { totalEvents, uniqueEventUsers, topViews, topPlugins, topTools, recentEvents, globalTopViews, globalTopTools },
-      usage: { tenantClients, tenantDocs, tenantTx, totalActivities },
-      owner: { globalActivities, globalActivityStats, tenants, workStats },
-      generatedAt: new Date().toISOString(),
-    });
+    return NextResponse.json(
+      {
+        visits: { total, unique, today, todayUnique, activeNow, activeToday, lastDays, hourly, topPaths, recentVisits, tenantVisits },
+        events: { totalEvents, uniqueEventUsers, topViews, topPlugins, topTools, recentEvents, globalTopViews, globalTopTools },
+        usage: { tenantClients, tenantDocs, tenantTx, totalActivities },
+        owner: { globalActivities, globalActivityStats, tenants, workStats },
+        generatedAt: new Date().toISOString(),
+      },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    );
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

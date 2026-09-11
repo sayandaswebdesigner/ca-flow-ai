@@ -544,7 +544,7 @@ function AnalyticsView() {
     setLoading(true);
     try {
       const h = getAnonHeaders() as Record<string, string>;
-      const res = await fetch(`/api/analytics?range=${range}`, { headers: h });
+      const res = await fetch(`/api/analytics?range=${range}&t=${Date.now()}`, { cache: 'no-store', headers: { ...h, 'Cache-Control': 'no-cache' } });
       const d = await res.json();
       if (!d.error) setData(d);
     } catch {}
